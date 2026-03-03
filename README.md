@@ -52,21 +52,21 @@ Husky runs on install (`prepare`) and sets up the pre-commit hook.
 
 ## Available Scripts
 
-| Script        | Description                              |
-| ------------- | ---------------------------------------- |
-| `dev`         | Start dev server (Turbopack)             |
-| `build`       | Production build                         |
-| `start`       | Serve production build                   |
-| `preview`     | Build and serve (production mode)        |
-| `lint`        | ESLint + TypeScript type-check          |
-| `lint:fix`    | ESLint with auto-fix                     |
-| `type-check`  | TypeScript type-check only               |
-| `fmt:check`   | Check Prettier formatting                |
-| `fmt`         | Format with Prettier                     |
-| `validate`    | `lint` + `fmt:check` + `build` (for CI)  |
-| `ui`          | Shadcn UI CLI                            |
-| `clean`       | Remove `.next` cache                     |
-| `cleani`      | Remove `.next` and `node_modules`, reinstall |
+| Script       | Description                                  |
+| ------------ | -------------------------------------------- |
+| `dev`        | Start dev server (Turbopack)                 |
+| `build`      | Production build                             |
+| `start`      | Serve production build                       |
+| `preview`    | Build and serve (production mode)            |
+| `lint`       | ESLint + TypeScript type-check               |
+| `lint:fix`   | ESLint with auto-fix                         |
+| `type-check` | TypeScript type-check only                   |
+| `fmt:check`  | Check Prettier formatting                    |
+| `fmt`        | Format with Prettier                         |
+| `validate`   | `lint` + `fmt:check` + `build` (for CI)      |
+| `ui`         | Shadcn UI CLI                                |
+| `clean`      | Remove `.next` cache                         |
+| `cleani`     | Remove `.next` and `node_modules`, reinstall |
 
 ## Project Structure
 
@@ -105,21 +105,3 @@ The template uses [bun](https://bun.sh/) and keeps `bun.lock`. To use npm, yarn,
 MIT – see [LICENSE](LICENSE).
 
 ## Contributors
-
-<div align=center>
-
-[![][contributors]][contributors-graph]
-
-_It may take up to 24h for the [contrib.rocks][contrib-rocks] plugin to update._
-
-</div>
-
-[views]: https://komarev.com/ghpvc/?username=nextjs-template&label=view%20counter&color=red&style=flat
-[repo-size]: https://img.shields.io/github/repo-size/Khushal-ag/nextjs-template
-[issues]: https://img.shields.io/github/issues-raw/Khushal-ag/nextjs-template
-[license]: https://img.shields.io/github/license/Khushal-ag/nextjs-template
-[forks]: https://img.shields.io/github/forks/Khushal-ag/nextjs-template?style=flat
-[stars]: https://img.shields.io/github/stars/Khushal-ag/nextjs-template
-[contributors]: https://contrib.rocks/image?repo=Khushal-ag/nextjs-template&max=500
-[contributors-graph]: https://github.com/Khushal-ag/nextjs-template/graphs/contributors
-[contrib-rocks]: https://contrib.rocks/preview?repo=Khushal-ag%2Fnextjs-template
