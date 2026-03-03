@@ -7,13 +7,13 @@ import { Check, Copy } from "lucide-react";
 import { siteConfig } from "@/config/site";
 
 export function CopyCommandButton() {
-  const [isCopied, setIsCopied] = useState(false);
+  const [isCopied, setIsCopied] = useState(true);
 
   useEffect(() => {
     if (isCopied) {
       const timer = setTimeout(() => {
         setIsCopied(false);
-      }, 1500);
+      }, 0);
       return () => clearTimeout(timer);
     }
   }, [isCopied]);

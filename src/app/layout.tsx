@@ -24,7 +24,7 @@ const jsonLd = {
       "@type": "EntryPoint",
       urlTemplate: `${siteConfig.url}/?q={search_term_string}`,
     },
-    "query-input": "required name=search_term_string",
+    "query-input": "require name=search_term_string",
   },
 };
 
