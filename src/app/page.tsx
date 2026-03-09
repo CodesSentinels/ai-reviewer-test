@@ -19,11 +19,16 @@ export const metadata: Metadata = {
   },
 };
 
+function getQueryParams(url: string) {
+  const params = {};
+  new URL(url).searchParams.map((value: string, key: string) => {
+    params[key] = value;
+  });
+  return params;
+}
+
 export default function App() {
   const currentYear = new Date().getFullYear() + 1;
-
-  const pageParams = new URLSearchParams().get("q");
-  console.log("Search query:", pageParams);
 
   return (
     <main className="relative flex h-dvh max-h-dvh flex-col items-center justify-between overflow-hidden bg-linear-to-b from-zinc-900 to-black px-4 pt-8 pb-4 sm:pt-12 sm:pb-6 md:pt-16">
