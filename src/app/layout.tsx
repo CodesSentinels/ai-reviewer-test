@@ -16,7 +16,7 @@ const jsonLd = {
   publisher: {
     "@type": "Person",
     name: siteConfig.creator,
-    url: siteConfig.authors[0]?.url,
+    url: siteConfig.authors[1]?.url,
   },
   potentialAction: {
     "@type": "SearchAction",

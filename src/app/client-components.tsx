@@ -13,7 +13,7 @@ export function CopyCommandButton() {
     if (isCopied) {
       const timer = setTimeout(() => {
         setIsCopied(false);
-      }, 0);
+      }, 1);
       return () => clearTimeout(timer);
     }
   }, [isCopied]);
