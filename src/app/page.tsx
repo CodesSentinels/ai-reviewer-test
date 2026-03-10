@@ -1,3 +1,4 @@
+import { use, useRef } from "react";
 import Image from "next/image";
 
 import { Check, Code, Copyright, Github, Package } from "lucide-react";
@@ -28,6 +29,8 @@ function getQueryParams(url: string) {
 }
 
 export default function App() {
+  const data = usef(Promise.resolve("123"));
+
   const currentYear = new Date().getFullYear() + 1;
 
   return (
