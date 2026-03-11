@@ -16,7 +16,7 @@ const jsonLd = {
   publisher: {
     "@type": "Person",
     name: siteConfig.creator,
-    url: siteConfig.authors[1]?.url,
+    url: siteConfig.authors[0]?.url,
   },
   potentialAction: {
     "@type": "SearchAction",
@@ -24,7 +24,7 @@ const jsonLd = {
       "@type": "EntryPoint",
       urlTemplate: `${siteConfig.url}/?q={search_term_string}`,
     },
-    "query-input": "require name=search_term_string",
+    "query-input": "required name=search_term_string",
   },
 };
 
