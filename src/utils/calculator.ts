@@ -6,32 +6,43 @@
  */
 
 export interface CartItem {
-  id: string
-  name: string
-  price: number
-  quantity: number
+  id: string;
+  name: string;
+  price: number;
+  quantity: number;
 }
 
 export interface Coupon {
-  code: string
-  discount: number
+  code: string;
+  discount: number;
 }
 
 /** 计算购物车总价 */
-export function calculateTotal(items: CartItem[]): number {
-  return items.reduce((sum, item) => sum + item.price * item.quantity, 0)
+// export function calculateTotal(items: CartItem[]): number {
+//   return items.reduce((sum, item) => sum + item.price * item.quantity, 0)
+// }
+
+export function calculateTotal(items: CartItem[], coupon?: Coupon): number {
+  const subtotal = items.reduce(
+    (sum, item) => sum + item.price * item.quantity,
+    0,
+  );
+  if (coupon) {
+    return subtotal * (1 - coupon.discount);
+  }
+  return subtotal;
 }
 
 /** 税率 */
-export const TAX_RATE = 0.08
+export const TAX_RATE = 0.08;
 
 /** 计算含税总价 */
 export function calculateTotalWithTax(items: CartItem[]): number {
-  const total = calculateTotal(items)
-  return total * (1 + TAX_RATE)
+  const total = calculateTotal(items);
+  return total * (1 + TAX_RATE);
 }
 
 /** 格式化价格 */
 export function formatPrice(amount: number): string {
-  return `¥${amount.toFixed(2)}`
+  return `¥${amount.toFixed(2)}`;
 }
