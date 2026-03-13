@@ -48,7 +48,7 @@ export function calculateTotal(items: CartItem[]): number {
 // }
 
 /** 税率 */
-export const TAX_RATE = 0.1;
+export const TAX_RATE = 0.08;
 
 /** 计算含税总价 */
 export function calculateTotalWithTax(items: CartItem[]): number {
