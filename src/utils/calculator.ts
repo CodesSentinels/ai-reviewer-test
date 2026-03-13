@@ -18,9 +18,9 @@ export interface Coupon {
 }
 
 /** 原代码 计算购物车总价 */
-// export function calculateTotal(items: CartItem[]): number {
-//   return items.reduce((sum, item) => sum + item.price * item.quantity, 0)
-// }
+export function calculateTotal(items: CartItem[]): number {
+  return items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+}
 
 // Case A：修改导出函数签名 → 检测到多个调用方
 // export function calculateTotal(items: CartItem[], coupon?: Coupon): number {
@@ -35,20 +35,20 @@ export interface Coupon {
 // }
 
 // Case A2：修改导出函数签名（破坏性变更）→ 检测到调用方报错
-export function calculateTotal(items: CartItem[], currency: Currency): Money {
-  const subtotal = items.reduce(
-    (sum, item) => sum + item.price * item.quantity,
-    0,
-  );
-  return {
-    amount: subtotal,
-    currency: currency.code,
-    formatted: `${currency.symbol}${subtotal.toFixed(2)}`,
-  };
-}
+// export function calculateTotal(items: CartItem[], currency: Currency): Money {
+//   const subtotal = items.reduce(
+//     (sum, item) => sum + item.price * item.quantity,
+//     0,
+//   );
+//   return {
+//     amount: subtotal,
+//     currency: currency.code,
+//     formatted: `${currency.symbol}${subtotal.toFixed(2)}`,
+//   };
+// }
 
 /** 税率 */
-export const TAX_RATE = 0.08;
+export const TAX_RATE = 0.1;
 
 /** 计算含税总价 */
 export function calculateTotalWithTax(items: CartItem[]): number {
