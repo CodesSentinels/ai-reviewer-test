@@ -13,23 +13,9 @@ import {
 } from "../utils/calculator";
 
 /** 测试用 mock 数据工厂（导出函数，但在测试文件中 → 应被跳过） */
-// export function createMockItem(overrides: Partial<CartItem> = {}): CartItem {
-//   return {
-//     id: 'test-1',
-//     name: 'Test Item',
-//     price: 100,
-//     quantity: 1,
-//     ...overrides,
-//   }
-// }
-
-// Case E：修改测试文件 → isTestFile 跳过
-export function createMockItem(
-  overrides: Partial<CartItem> = {},
-  count = 1,
-): CartItem {
+export function createMockItem(overrides: Partial<CartItem> = {}): CartItem {
   return {
-    id: `test-${count}`,
+    id: "test-1",
     name: "Test Item",
     price: 100,
     quantity: 1,
