@@ -10,12 +10,7 @@ import { createOrder } from "../services/orderService";
 import { logInfo, setLogLevel } from "../utils/logger";
 
 /** 应用版本号（导出但作为入口文件不应被追踪） */
-export const APP_VERSION = "2.0.0";
-
-/** 新增健康检查 */
-export function healthCheck(): boolean {
-  return true;
-}
+export const APP_VERSION = "1.0.0";
 
 /** 初始化应用 */
 export async function initApp(): Promise<void> {
