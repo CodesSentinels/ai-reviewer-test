@@ -17,20 +17,34 @@ export interface Coupon {
   discount: number;
 }
 
-/** 计算购物车总价 */
+/** 原代码 计算购物车总价 */
 // export function calculateTotal(items: CartItem[]): number {
 //   return items.reduce((sum, item) => sum + item.price * item.quantity, 0)
 // }
 
-export function calculateTotal(items: CartItem[], coupon?: Coupon): number {
+// Case A：修改导出函数签名 → 检测到多个调用方
+// export function calculateTotal(items: CartItem[], coupon?: Coupon): number {
+//   const subtotal = items.reduce(
+//     (sum, item) => sum + item.price * item.quantity,
+//     0,
+//   );
+//   if (coupon) {
+//     return subtotal * (1 - coupon.discount);
+//   }
+//   return subtotal;
+// }
+
+// Case A2：修改导出函数签名（破坏性变更）→ 检测到调用方报错
+export function calculateTotal(items: CartItem[], currency: Currency): Money {
   const subtotal = items.reduce(
     (sum, item) => sum + item.price * item.quantity,
     0,
   );
-  if (coupon) {
-    return subtotal * (1 - coupon.discount);
-  }
-  return subtotal;
+  return {
+    amount: subtotal,
+    currency: currency.code,
+    formatted: `${currency.symbol}${subtotal.toFixed(2)}`,
+  };
 }
 
 /** 税率 */

@@ -79,33 +79,35 @@ src/
 
 **Step 2~5** — 依赖图构建，找到以下文件导入了 `calculator.ts`：
 
-| 文件 | 导入的符号 |
-|------|-----------|
-| `src/hooks/useCart.ts` | `calculateTotal`, `calculateTotalWithTax`, `TAX_RATE` |
-| `src/components/CartSummary.tsx` | `calculateTotal`, `TAX_RATE`, `formatPrice` |
-| `src/components/CheckoutForm.tsx` | `calculateTotal`, `formatPrice` |
-| `src/components/ProductCard.tsx` | `formatPrice` |
-| `src/services/orderService.ts` | `calculateTotal`, `calculateTotalWithTax` |
-| `src/services/analyticsService.ts` | `calculateTotal` |
-| `src/pages/CheckoutPage.tsx` | `TAX_RATE` |
+| 文件                               | 导入的符号                                            |
+| ---------------------------------- | ----------------------------------------------------- |
+| `src/hooks/useCart.ts`             | `calculateTotal`, `calculateTotalWithTax`, `TAX_RATE` |
+| `src/components/CartSummary.tsx`   | `calculateTotal`, `TAX_RATE`, `formatPrice`           |
+| `src/components/CheckoutForm.tsx`  | `calculateTotal`, `formatPrice`                       |
+| `src/components/ProductCard.tsx`   | `formatPrice`                                         |
+| `src/services/orderService.ts`     | `calculateTotal`, `calculateTotalWithTax`             |
+| `src/services/analyticsService.ts` | `calculateTotal`                                      |
+| `src/pages/CheckoutPage.tsx`       | `TAX_RATE`                                            |
 
 **Step 6** — 引用搜索，`calculateTotal` 的引用位置：
 
-| 文件 | 行 | 内容 |
-|------|-----|------|
-| `useCart.ts` | ~39 | `const subtotal = useMemo(() => calculateTotal(items), [items])` |
-| `CartSummary.tsx` | ~29 | `const subtotal = calculateTotal(items)` |
-| `CheckoutForm.tsx` | ~25 | `const total = calculateTotal(items)` |
-| `orderService.ts` | ~26 | `const subtotal = calculateTotal(items)` |
-| `analyticsService.ts` | ~22 | `const total = calculateTotal(items)` |
+| 文件                  | 行  | 内容                                                             |
+| --------------------- | --- | ---------------------------------------------------------------- |
+| `useCart.ts`          | ~39 | `const subtotal = useMemo(() => calculateTotal(items), [items])` |
+| `CartSummary.tsx`     | ~29 | `const subtotal = calculateTotal(items)`                         |
+| `CheckoutForm.tsx`    | ~25 | `const total = calculateTotal(items)`                            |
+| `orderService.ts`     | ~26 | `const subtotal = calculateTotal(items)`                         |
+| `analyticsService.ts` | ~22 | `const total = calculateTotal(items)`                            |
 
 **注入的跨文件上下文**：
 
 ```markdown
 ### Modified exports in this file:
+
 - `calculateTotal` (function)
 
 ### Files that import from this file (7):
+
 - src/hooks/useCart.ts
 - src/components/CartSummary.tsx
 - src/components/CheckoutForm.tsx
@@ -115,6 +117,7 @@ src/
 - src/pages/CheckoutPage.tsx
 
 ### References to modified symbols:
+
 - src/hooks/useCart.ts:39: const subtotal = useMemo(() => calculateTotal(items), [items])
 - src/components/CartSummary.tsx:29: const subtotal = calculateTotal(items)
 - src/components/CheckoutForm.tsx:25: const total = calculateTotal(items)
@@ -126,6 +129,105 @@ src/
 
 > `calculateTotal` 新增了可选参数 `coupon?: Coupon`，以下 5 处调用方均未传递此参数。
 > 由于参数可选，现有调用不会报错，但需确认是否需要在调用方同步支持优惠券逻辑。
+
+---
+
+## Case A2：修改导出函数签名（破坏性变更）→ 检测到调用方报错
+
+### 修改目标
+
+`src/utils/calculator.ts` — 修改 `calculateTotal` 的函数签名，将原有参数改为必选新参数（破坏性变更）
+
+### PR diff 模拟
+
+```diff
+--- a/src/utils/calculator.ts
++++ b/src/utils/calculator.ts
+@@ -21,7 +21,12 @@
+
+ /** 计算购物车总价 */
+-export function calculateTotal(items: CartItem[]): number {
+-  return items.reduce((sum, item) => sum + item.price * item.quantity, 0)
++export function calculateTotal(items: CartItem[], currency: Currency): Money {
++  const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
++  return {
++    amount: subtotal,
++    currency: currency.code,
++    formatted: `${currency.symbol}${subtotal.toFixed(2)}`
++  }
+ }
+```
+
+### 与 Case A 的区别
+
+|            | Case A                    | Case A2                              |
+| ---------- | ------------------------- | ------------------------------------ |
+| 新参数     | `coupon?: Coupon`（可选） | `currency: Currency`（必选）         |
+| 返回类型   | 不变（`number`）          | 变更（`number` → `Money`）           |
+| 调用方影响 | 不报错，但需确认逻辑      | **编译报错**，所有调用方必须同步修改 |
+
+### 预期行为
+
+**Step 1** — 提取到修改的导出符号：`calculateTotal` (function)
+
+**Step 2~5** — 依赖图构建，与 Case A 相同，找到以下文件导入了 `calculator.ts`：
+
+| 文件                               | 导入的符号                                            |
+| ---------------------------------- | ----------------------------------------------------- |
+| `src/hooks/useCart.ts`             | `calculateTotal`, `calculateTotalWithTax`, `TAX_RATE` |
+| `src/components/CartSummary.tsx`   | `calculateTotal`, `TAX_RATE`, `formatPrice`           |
+| `src/components/CheckoutForm.tsx`  | `calculateTotal`, `formatPrice`                       |
+| `src/services/orderService.ts`     | `calculateTotal`, `calculateTotalWithTax`             |
+| `src/services/analyticsService.ts` | `calculateTotal`                                      |
+
+**Step 6** — 引用搜索，`calculateTotal` 的引用位置：
+
+| 文件                  | 行  | 内容                                                             | 报错原因                                                     |
+| --------------------- | --- | ---------------------------------------------------------------- | ------------------------------------------------------------ |
+| `useCart.ts`          | ~39 | `const subtotal = useMemo(() => calculateTotal(items), [items])` | 缺少必选参数 `currency`；返回类型不再是 `number`             |
+| `CartSummary.tsx`     | ~29 | `const subtotal = calculateTotal(items)`                         | 缺少必选参数 `currency`；`subtotal` 类型不再是 `number`      |
+| `CheckoutForm.tsx`    | ~25 | `const total = calculateTotal(items)`                            | 缺少必选参数 `currency`；`total` 类型不再是 `number`         |
+| `orderService.ts`     | ~26 | `const subtotal = calculateTotal(items)`                         | 缺少必选参数 `currency`；后续计算 `subtotal * TAX_RATE` 报错 |
+| `analyticsService.ts` | ~22 | `const total = calculateTotal(items)`                            | 缺少必选参数 `currency`；`total` 类型不再是 `number`         |
+
+**注入的跨文件上下文**：
+
+```markdown
+### Modified exports in this file:
+
+- `calculateTotal` (function)
+
+### Files that import from this file (7):
+
+- src/hooks/useCart.ts
+- src/components/CartSummary.tsx
+- src/components/CheckoutForm.tsx
+- src/components/ProductCard.tsx
+- src/services/orderService.ts
+- src/services/analyticsService.ts
+- src/pages/CheckoutPage.tsx
+
+### References to modified symbols:
+
+- src/hooks/useCart.ts:39: const subtotal = useMemo(() => calculateTotal(items), [items])
+- src/components/CartSummary.tsx:29: const subtotal = calculateTotal(items)
+- src/components/CheckoutForm.tsx:25: const total = calculateTotal(items)
+- src/services/orderService.ts:26: const subtotal = calculateTotal(items)
+- src/services/analyticsService.ts:22: const total = calculateTotal(items)
+```
+
+**AI 审查预期输出**：
+
+> ⚠️ **破坏性变更**：`calculateTotal` 新增了必选参数 `currency: Currency`，且返回类型从 `number` 变为 `Money`。
+> 以下 5 处调用方会产生编译错误，必须同步修改：
+>
+> 1. `useCart.ts:39` — `calculateTotal(items)` 缺少 `currency` 参数，且 `subtotal` 被当作 `number` 使用
+> 2. `CartSummary.tsx:29` — 同上，`subtotal` 后续参与数值计算会类型不匹配
+> 3. `CheckoutForm.tsx:25` — 同上
+> 4. `orderService.ts:26` — `subtotal * TAX_RATE` 将报错，因为 `subtotal` 现在是 `Money` 类型
+> 5. `analyticsService.ts:22` — 同上
+>
+> 建议：此 PR 应同步修改所有调用方，或提供向后兼容的重载签名。
 
 ---
 
@@ -148,11 +250,11 @@ src/
 
 **Step 6** — `TAX_RATE` 的引用位置：
 
-| 文件 | 行 | 内容 |
-|------|-----|------|
-| `useCart.ts` | ~41 | `const taxAmount = useMemo(() => subtotal * TAX_RATE, [subtotal])` |
-| `CartSummary.tsx` | ~30 | `const tax = subtotal * TAX_RATE` |
-| `CheckoutPage.tsx` | ~30 | `当前税率: {formatPercent(TAX_RATE)}` |
+| 文件               | 行  | 内容                                                               |
+| ------------------ | --- | ------------------------------------------------------------------ |
+| `useCart.ts`       | ~41 | `const taxAmount = useMemo(() => subtotal * TAX_RATE, [subtotal])` |
+| `CartSummary.tsx`  | ~30 | `const tax = subtotal * TAX_RATE`                                  |
+| `CheckoutPage.tsx` | ~30 | `当前税率: {formatPercent(TAX_RATE)}`                              |
 
 **AI 审查预期**：提醒税率从 8% 改为 10%，影响 3 处计算/展示。
 
@@ -179,6 +281,7 @@ src/
 **Step 1** — `padZero` 没有 `export` 关键字 → `extractModifiedSymbols` 返回的符号中 `isExported = false` → 被过滤，不加入 `allModifiedSymbols`
 
 **结果**：该文件在 step 1 直接被跳过，日志输出：
+
 ```
 dependency analysis [step 1]: src/utils/formatter.ts → no modified exports (1 internal symbols), skipping
 ```
@@ -210,6 +313,7 @@ dependency analysis [step 1]: src/utils/formatter.ts → no modified exports (1 
 **Step 1** — 提取符号：`APP_VERSION` (variable), `healthCheck` (function)
 
 **Step 1.5** — `main.ts` 匹配 `isEntryPointFile` 规则 → 日志输出：
+
 ```
 dependency analysis [step 1.5]: ✗ skipping src/app/main.ts (entry point file — imports others but is not imported)
 ```
@@ -240,6 +344,7 @@ dependency analysis [step 1.5]: ✗ skipping src/app/main.ts (entry point file �
 **Step 1** — 提取符号：`createMockItem` (function, exported)
 
 **Step 1.5** — `__tests__/calculator.test.ts` 匹配 `isTestFile` 规则 → 日志输出：
+
 ```
 dependency analysis [step 1.5]: ✗ skipping src/__tests__/calculator.test.ts (test file — not imported by production code)
 ```
@@ -275,6 +380,7 @@ dependency analysis [step 1.5]: ✗ skipping src/__tests__/calculator.test.ts (t
 **Step 2~5** — 扫描所有候选文件，但没有任何文件 `import { validateEmail } from './validator'`
 
 **Step 6** — 依赖图中 `validator.ts` 的 dependents 为空 → 日志输出：
+
 ```
 dependency analysis [step 6]: ✗ src/utils/validator.ts has 0 dependents — no files import it, skipping reference search
 ```
@@ -305,12 +411,12 @@ dependency analysis [step 6]: ✗ src/utils/validator.ts has 0 dependents — no
 
 **Step 2~5** — 找到 4+ 个文件导入了 `logInfo`：
 
-| 文件 | 导入方式 |
-|------|---------|
-| `useCart.ts` | `import { logInfo } from '../utils/logger'` |
-| `CartSummary.tsx` | `import { logInfo } from '../utils/logger'` |
-| `CheckoutForm.tsx` | `import { logInfo, logError } from '../utils/logger'` |
-| `orderService.ts` | `import { logInfo, logError, logWarn } from '../utils/logger'` |
+| 文件               | 导入方式                                                       |
+| ------------------ | -------------------------------------------------------------- |
+| `useCart.ts`       | `import { logInfo } from '../utils/logger'`                    |
+| `CartSummary.tsx`  | `import { logInfo } from '../utils/logger'`                    |
+| `CheckoutForm.tsx` | `import { logInfo, logError } from '../utils/logger'`          |
+| `orderService.ts`  | `import { logInfo, logError, logWarn } from '../utils/logger'` |
 
 **去重验证**：`CheckoutForm.tsx` 和 `orderService.ts` 各只出现一次（即使它们导入了多个符号）
 
@@ -369,6 +475,7 @@ dependency analysis [step 6]: ✗ src/utils/validator.ts has 0 dependents — no
 **Step 5** — `analyticsService.ts` 的 `import * as logger` 被解析为 `isNamespace: true`，`importedSymbols: ['logger']`
 
 **Step 6** — `dep.symbols = ['logger']`，与 `symbolNames = ['setLogLevel']` 无交集 → fallback 到全量搜索 → 在文件中搜索 `setLogLevel` → 找到：
+
 ```
 analyticsService.ts:36: logger.setLogLevel(level)
 ```
@@ -412,22 +519,22 @@ injected cross-file context for src/utils/calculator.ts: 342 tokens
 
 在一个 PR 中同时修改多个文件，验证复合场景：
 
-| PR 内容 | 涵盖 Case |
-|---------|----------|
-| 修改 `calculator.ts` (calculateTotal + TAX_RATE) + 修改 `formatter.ts` (padZero) | A + B + C |
+| PR 内容                                                                               | 涵盖 Case |
+| ------------------------------------------------------------------------------------- | --------- |
+| 修改 `calculator.ts` (calculateTotal + TAX_RATE) + 修改 `formatter.ts` (padZero)      | A + B + C |
 | 修改 `logger.ts` (logInfo) + 修改 `main.ts` (APP_VERSION) + 修改 `calculator.test.ts` | G + D + E |
-| 修改 `validator.ts` (validateEmail) + 修改 `logger.ts` (setLogLevel) | F + I |
+| 修改 `validator.ts` (validateEmail) + 修改 `logger.ts` (setLogLevel)                  | F + I     |
 
 ---
 
 ## 配置参数参考
 
-| 参数 | 默认值 | 说明 |
-|------|--------|------|
-| `enable_dependency_analysis` | `true` | 启用/禁用跨文件依赖分析 |
-| `max_dependency_files` | `50` | 最大扫描外部文件数 |
-| `path_filters` | 无 | 文件过滤规则，依赖分析也遵守 |
-| `debug` | `false` | 开启后可在 Actions 日志中查看分析详情 |
+| 参数                         | 默认值  | 说明                                  |
+| ---------------------------- | ------- | ------------------------------------- |
+| `enable_dependency_analysis` | `true`  | 启用/禁用跨文件依赖分析               |
+| `max_dependency_files`       | `50`    | 最大扫描外部文件数                    |
+| `path_filters`               | 无      | 文件过滤规则，依赖分析也遵守          |
+| `debug`                      | `false` | 开启后可在 Actions 日志中查看分析详情 |
 
 ---
 
