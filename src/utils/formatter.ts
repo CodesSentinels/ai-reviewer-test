@@ -5,14 +5,14 @@
  */
 
 /** 内部辅助函数（不导出） */
-// function padZero(num: number): string {
-//   return num < 10 ? `0${num}` : `${num}`
-// }
+function padZero(num: number): string {
+  return num < 10 ? `0${num}` : `${num}`;
+}
 
 // Case C：修改内部函数 padZero → 不应触发跨文件分析
-function padZero(num: number, width = 2): string {
-  return String(num).padStart(width, "0");
-}
+// function padZero(num: number, width = 2): string {
+//   return String(num).padStart(width, "0");
+// }
 
 /** 格式化日期 */
 export function formatDate(date: Date): string {
