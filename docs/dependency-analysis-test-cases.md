@@ -11,7 +11,7 @@ src/
 ├── utils/
 │   ├── calculator.ts    ← Case A / B 的修改目标
 │   ├── formatter.ts     ← Case C 的修改目标
-│   ├── validator.ts     ← Case F 的修改目标（无人引用）
+│   ├── validator.ts     ← Case F 的修改目标（通过 index.ts re-export）
 │   ├── logger.ts        ← Case G 的修改目标（多文件引用）
 │   └── index.ts         ← Case H 的修改目标（re-export）
 │
@@ -31,8 +31,15 @@ src/
 ├── services/
 │   ├── orderService.ts   → imports { calculateTotal, calculateTotalWithTax } from calculator
 │   │                     → imports { logInfo, logError, logWarn } from logger
-│   └── analyticsService.ts → import * as logger from logger  (namespace)
-│                            → imports { calculateTotal } from calculator
+│   ├── analyticsService.ts → import * as logger from logger  (namespace)
+│   │                        → imports { calculateTotal } from calculator
+│   ├── discountService.ts  → imports { calculateTotal as calcTotal, TAX_RATE as taxRate } ← Case J (符号别名)
+│   │                        → imports { logInfo as log } from logger
+│   ├── reportService.ts    → imports from '@/utils/calculator'  ← Case K (路径别名 @/)
+│   │                        → imports from '@/utils/formatter'
+│   │                        → imports from '@/utils/logger'
+│   └── pricingAdapter.ts   → imports { calculateTotal as computeSubtotal } from '@/utils/calculator' ← Case L (组合)
+│                            → imports { logInfo as info, logWarn as warn } from '@/utils/logger'
 │
 ├── pages/
 │   └── CheckoutPage.tsx  → imports { TAX_RATE } from calculator
@@ -353,11 +360,11 @@ dependency analysis [step 1.5]: ✗ skipping src/__tests__/calculator.test.ts (t
 
 ---
 
-## Case F：有导出符号但无文件引用 → 引用搜索为空
+## Case F：有导出符号且通过 re-export 被引用 → 检测到间接依赖
 
 ### 修改目标
 
-`src/utils/validator.ts` — 修改 `validateEmail` 的实现
+`src/utils/validator.ts` — 修改 `validateEmail` 的返回类型（破坏性变更）
 
 ### PR diff 模拟
 
@@ -377,15 +384,53 @@ dependency analysis [step 1.5]: ✗ skipping src/__tests__/calculator.test.ts (t
 
 **Step 1** — 提取符号：`validateEmail` (function, exported)
 
-**Step 2~5** — 扫描所有候选文件，但没有任何文件 `import { validateEmail } from './validator'`
-
-**Step 6** — 依赖图中 `validator.ts` 的 dependents 为空 → 日志输出：
+日志输出：
 
 ```
-dependency analysis [step 6]: ✗ src/utils/validator.ts has 0 dependents — no files import it, skipping reference search
+dependency analysis [step 1]: analyzing 1 modified files for exported symbols
+dependency analysis [step 1]: src/utils/validator.ts → 1 exported / 1 total symbols: [validateEmail(function)]
 ```
 
-**结果**：`fileAnalyses` 中 `references = []`，不注入跨文件上下文。但 AI 仍然能审查 `validateEmail` 返回类型变更（从 `boolean` 变为对象），只是不会提及跨文件影响。
+**Step 2** — PR 内文件扫描，无直接导入方：
+
+```
+dependency analysis [step 2]: PR-internal scan complete — 0 import relationships found (0 API calls for head content)
+```
+
+**Step 3~4** — 扫描外部候选文件：
+
+```
+dependency analysis [step 3]: scanning 28 external candidate files (API calls needed: 28)
+dependency analysis [step 4]: fetched 28 external file contents (28 total in cache including 0 PR files from step 2)
+```
+
+**Step 5** — 发现 `index.ts` 通过 re-export 引用了 `validator.ts`：
+
+```
+dependency analysis [step 5]: ✓ external hit: src/utils/index.ts imports {validateEmail, validatePhone, validatePassword} from src/utils/validator.ts
+dependency analysis [step 5]: external scan complete — 1 import relationships found
+```
+
+**Step 6** — 引用搜索，在 `index.ts` 中找到 `validateEmail` 的引用：
+
+```
+dependency analysis [step 6]: src/utils/validator.ts has 1 dependents, searching for references to [validateEmail]
+dependency analysis [step 6]: ✓ src/utils/index.ts → 1 references found: [validateEmail:L10]
+```
+
+**汇总**：
+
+```
+dependency analysis [summary]: 1 files analyzed, 1 cross-file references found
+dependency analysis [summary]: 1 files have external references, 0 files have no references (API calls used: 28)
+```
+
+**注意**：虽然没有业务文件直接 `import { validateEmail } from './validator'`，但 `src/utils/index.ts` 通过 `export { validateEmail } from './validator'` 形成了 re-export 关系，被依赖分析正确检测到。如果其他文件通过 `import { validateEmail } from '../utils'`（via index.ts）间接引用，当前分析只能追踪到 `index.ts` 层级（已知局限 #2）。
+
+**AI 审查预期输出**：
+
+> `validateEmail` 的返回类型从 `boolean` 变为 `{ valid: boolean; reason?: string }`，属于破坏性变更。
+> `src/utils/index.ts` re-export 了该函数，任何通过 `index.ts` 间接引用的调用方都需要适配新的返回类型。
 
 ---
 
@@ -482,6 +527,220 @@ analyticsService.ts:36: logger.setLogLevel(level)
 
 ---
 
+## Case J：符号别名（import { X as Y }）→ 别名引用被正确追踪
+
+### 修改目标
+
+`src/utils/calculator.ts` — 修改 `calculateTotal` 的函数签名（与 Case A 相同的修改）
+
+### 背景
+
+`src/services/discountService.ts` 使用符号别名导入：
+
+```typescript
+import { calculateTotal as calcTotal, TAX_RATE as taxRate } from '../utils/calculator'
+import { logInfo as log } from '../utils/logger'
+```
+
+代码中实际使用的是 `calcTotal()`、`taxRate`、`log()`，不是原始名称。
+
+### PR diff 模拟
+
+```diff
+--- a/src/utils/calculator.ts
++++ b/src/utils/calculator.ts
+@@ -21,7 +21,11 @@
+
+ /** 计算购物车总价 */
+-export function calculateTotal(items: CartItem[]): number {
+-  return items.reduce((sum, item) => sum + item.price * item.quantity, 0)
++export function calculateTotal(items: CartItem[], coupon?: Coupon): number {
++  const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
++  if (coupon) {
++    return subtotal * (1 - coupon.discount)
++  }
++  return subtotal
+ }
+```
+
+### 预期行为
+
+**Step 1** — 提取到修改的导出符号：`calculateTotal` (function)
+
+**Step 2~5** — 依赖图构建，除了 Case A 已有的文件外，还应发现 `discountService.ts`：
+
+| 文件                              | 导入的符号                      | aliasMap                                          |
+| --------------------------------- | ------------------------------- | ------------------------------------------------- |
+| `src/services/discountService.ts` | `calculateTotal`, `TAX_RATE`    | `{ calculateTotal: 'calcTotal', TAX_RATE: 'taxRate' }` |
+
+**Step 6** — 引用搜索，搜索时同时匹配原始名 `calculateTotal` 和别名 `calcTotal`：
+
+| 文件                 | 行   | 内容                                       | 匹配方式   |
+| -------------------- | ---- | ------------------------------------------ | ---------- |
+| `discountService.ts` | ~24  | `const originalTotal = calcTotal(items)`   | 别名匹配   |
+| `discountService.ts` | ~42  | `const total = calcTotal(items)`           | 别名匹配   |
+
+**注入的跨文件上下文**（discountService.ts 部分）：
+
+```markdown
+### References to modified symbols:
+- src/services/discountService.ts:24: const originalTotal = calcTotal(items)
+- src/services/discountService.ts:42: const total = calcTotal(items)
+```
+
+**AI 审查预期输出**：
+
+> `calculateTotal` 新增了可选参数 `coupon?: Coupon`。`discountService.ts` 中通过别名 `calcTotal` 调用了该函数 2 次（第 24、42 行），当前未传递 coupon 参数。考虑到该服务本身就在处理折扣逻辑，可能需要将 coupon 传入 `calcTotal` 调用。
+
+### 与 Case A 的区别
+
+|            | Case A                      | Case J                                          |
+| ---------- | --------------------------- | ----------------------------------------------- |
+| 导入方式   | `import { calculateTotal }` | `import { calculateTotal as calcTotal }`        |
+| 代码中使用 | `calculateTotal(items)`     | `calcTotal(items)`                              |
+| 搜索方式   | 直接匹配 `calculateTotal`   | 同时匹配 `calculateTotal` + 别名 `calcTotal`    |
+| 修复前     | ✓ 能检测                    | ✗ 无法检测（只搜索原始名）                      |
+| 修复后     | ✓ 能检测                    | ✓ 能检测（aliasMap 扩展搜索）                   |
+
+---
+
+## Case K：路径别名（@/ 前缀）→ 路径能被正确解析
+
+### 修改目标
+
+`src/utils/calculator.ts` — 修改 `calculateTotal` 的函数签名（与 Case A 相同的修改）
+
+### 背景
+
+`src/services/reportService.ts` 使用 `@/` 路径别名导入（tsconfig.json 配置了 `@/*` → `./src/*`）：
+
+```typescript
+import { calculateTotal, formatPrice, TAX_RATE } from '@/utils/calculator'
+import { formatDate, formatPercent } from '@/utils/formatter'
+import { logInfo } from '@/utils/logger'
+```
+
+### PR diff 模拟
+
+与 Case A 相同。
+
+### 预期行为
+
+**Step 2~5** — `resolveImportPath` 对 `@/utils/calculator` 的解析过程：
+
+1. 检测到 `@/` 前缀，匹配 `PATH_ALIAS_RULES`
+2. 去掉前缀得到 `utils/calculator`
+3. 依次尝试 `src/utils/calculator`、`app/utils/calculator`、`lib/utils/calculator`
+4. `src/utils/calculator.ts` 在 `repoFilesSet` 中命中 → 返回 `src/utils/calculator.ts`
+
+| 文件                            | 导入路径              | 解析结果                  |
+| ------------------------------- | --------------------- | ------------------------- |
+| `src/services/reportService.ts` | `@/utils/calculator`  | `src/utils/calculator.ts` |
+
+**Step 6** — 引用搜索正常进行：
+
+| 文件               | 行   | 内容                                       |
+| ------------------ | ---- | ------------------------------------------ |
+| `reportService.ts` | ~31  | `const subtotal = calculateTotal(items)`   |
+
+**注入的跨文件上下文**：
+
+```markdown
+### Files that import from this file:
+- src/services/reportService.ts
+
+### References to modified symbols:
+- src/services/reportService.ts:31: const subtotal = calculateTotal(items)
+```
+
+**AI 审查预期输出**：
+
+> `calculateTotal` 新增了可选参数 `coupon?: Coupon`。`reportService.ts` 通过路径别名 `@/utils/calculator` 导入并在第 31 行调用，需确认报表场景是否需要支持优惠券。
+
+### 与 Case A 的区别
+
+|            | Case A                           | Case K                                  |
+| ---------- | -------------------------------- | --------------------------------------- |
+| 导入路径   | `../utils/calculator`（相对路径）| `@/utils/calculator`（路径别名）        |
+| 解析方式   | `resolveRelativePath`            | `PATH_ALIAS_RULES` 前缀匹配            |
+| 修复前     | ✓ 能解析                         | ✗ 返回 null（非 `.` 开头直接跳过）     |
+| 修复后     | ✓ 能解析                         | ✓ 能解析（@/ → src/ 映射）             |
+
+---
+
+## Case L：路径别名 + 符号别名组合 → 两种别名同时生效
+
+### 修改目标
+
+`src/utils/calculator.ts` — 修改 `calculateTotal` 的函数签名
+
+### 背景
+
+`src/services/pricingAdapter.ts` **同时** 使用路径别名和符号别名：
+
+```typescript
+import {
+  calculateTotal as computeSubtotal,
+  TAX_RATE as defaultTaxRate,
+  formatPrice as fmtPrice,
+} from '@/utils/calculator'
+import { logInfo as info, logWarn as warn } from '@/utils/logger'
+```
+
+这是最复杂的场景：路径解析需要处理 `@/` 前缀，符号追踪需要通过 `aliasMap` 匹配别名。
+
+### PR diff 模拟
+
+与 Case A 相同。
+
+### 预期行为
+
+**Step 2~5** — 路径解析 + 别名提取同时工作：
+
+1. `@/utils/calculator` → `resolveImportPath` 通过 `PATH_ALIAS_RULES` 解析为 `src/utils/calculator.ts`
+2. `parseImports` 提取 `importedSymbols: ['calculateTotal', 'TAX_RATE', 'formatPrice']`，`aliasMap: { calculateTotal: 'computeSubtotal', TAX_RATE: 'defaultTaxRate', formatPrice: 'fmtPrice' }`
+
+| 文件                              | 导入路径             | 解析结果                  | aliasMap                                                                             |
+| --------------------------------- | -------------------- | ------------------------- | ------------------------------------------------------------------------------------ |
+| `src/services/pricingAdapter.ts`  | `@/utils/calculator` | `src/utils/calculator.ts` | `{ calculateTotal: 'computeSubtotal', TAX_RATE: 'defaultTaxRate', formatPrice: 'fmtPrice' }` |
+
+**Step 6** — 搜索时同时匹配 `calculateTotal` + `computeSubtotal`：
+
+| 文件                | 行   | 内容                                             | 匹配方式 |
+| ------------------- | ---- | ------------------------------------------------ | -------- |
+| `pricingAdapter.ts` | ~36  | `const subtotal = computeSubtotal(items) * rate` | 别名匹配 |
+
+**注入的跨文件上下文**：
+
+```markdown
+### References to modified symbols:
+- src/services/pricingAdapter.ts:36: const subtotal = computeSubtotal(items) * rate
+```
+
+**AI 审查预期输出**：
+
+> `calculateTotal` 新增了可选参数 `coupon?: Coupon`。`pricingAdapter.ts` 通过路径别名 `@/utils/calculator` + 符号别名 `computeSubtotal` 导入并调用（第 36 行），当前未传递 coupon 参数。
+
+### 两种别名的协作流程
+
+```
+源文件修改: calculateTotal 签名变更
+    ↓
+路径别名解析: @/utils/calculator → src/utils/calculator.ts (resolveImportPath)
+    ↓
+符号原始名提取: importedSymbols = ['calculateTotal'] (parseImports)
+    ↓
+别名映射记录: aliasMap = { calculateTotal: 'computeSubtotal' } (parseImports)
+    ↓
+依赖图存储: { file: 'pricingAdapter.ts', symbols: ['calculateTotal'], aliasMap: {...} }
+    ↓
+引用搜索扩展: searchSymbols = ['calculateTotal', 'computeSubtotal'] (analyzeDependencies step 6)
+    ↓
+匹配成功: computeSubtotal(items) → 引用被检测到
+```
+
+---
+
 ## 测试执行方法
 
 ### 方法 1：创建真实 PR
@@ -519,11 +778,12 @@ injected cross-file context for src/utils/calculator.ts: 342 tokens
 
 在一个 PR 中同时修改多个文件，验证复合场景：
 
-| PR 内容                                                                               | 涵盖 Case |
-| ------------------------------------------------------------------------------------- | --------- |
-| 修改 `calculator.ts` (calculateTotal + TAX_RATE) + 修改 `formatter.ts` (padZero)      | A + B + C |
-| 修改 `logger.ts` (logInfo) + 修改 `main.ts` (APP_VERSION) + 修改 `calculator.test.ts` | G + D + E |
-| 修改 `validator.ts` (validateEmail) + 修改 `logger.ts` (setLogLevel)                  | F + I     |
+| PR 内容                                                                               | 涵盖 Case   |
+| ------------------------------------------------------------------------------------- | ----------- |
+| 修改 `calculator.ts` (calculateTotal + TAX_RATE) + 修改 `formatter.ts` (padZero)      | A + B + C   |
+| 修改 `logger.ts` (logInfo) + 修改 `main.ts` (APP_VERSION) + 修改 `calculator.test.ts` | G + D + E   |
+| 修改 `validator.ts` (validateEmail) + 修改 `logger.ts` (setLogLevel)                  | F + I       |
+| 修改 `calculator.ts` (calculateTotal) — 验证 discountService/reportService/pricingAdapter | A + J + K + L |
 
 ---
 
@@ -540,7 +800,10 @@ injected cross-file context for src/utils/calculator.ts: 342 tokens
 
 ## 已知局限
 
-1. **仅 TS/JS 有效**：`resolveImportPath` 只处理相对路径（`./`、`../`），Python/Go/Java 的绝对导入无法解析
+1. **仅 TS/JS 有效**：`resolveImportPath` 只处理相对路径和常见别名前缀，Python/Go/Java 的绝对导入无法解析
 2. **不追踪 re-export 链**：通过 `index.ts` 间接导入的关系只能解析到 `index.ts` 本身
 3. **namespace import 精度低**：`import * as X` 时无法知道具体使用了哪些符号，fallback 到全量搜索
-4. **tsconfig paths 不支持**：如 `@/utils/calculator` 这类别名路径无法解析
+4. ~~**tsconfig paths 不支持**：如 `@/utils/calculator` 这类别名路径无法解析~~ → **已修复**（Case K/L），支持 `@/`、`~/`、`#/` 前缀
+5. ~~**符号别名不追踪**：`import { foo as bar }` 时只搜索原始名 `foo`，找不到 `bar` 的使用~~ → **已修复**（Case J/L），通过 `aliasMap` 同时搜索原始名和别名
+6. **自定义 tsconfig paths 不支持**：非 `@/~/# ` 前缀的自定义路径映射（如 `@lib/xxx`、`@components/xxx`）暂不支持，需读取 tsconfig.json
+7. **namespace 解构别名**：`const { foo: bar } = utils` 需要数据流分析，暂不支持
