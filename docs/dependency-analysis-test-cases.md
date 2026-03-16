@@ -13,7 +13,8 @@ src/
 │   ├── formatter.ts     ← Case C 的修改目标
 │   ├── validator.ts     ← Case F 的修改目标（通过 index.ts re-export）
 │   ├── logger.ts        ← Case G 的修改目标（多文件引用）
-│   └── index.ts         ← Case H 的修改目标（re-export）
+│   ├── mathHelpers.ts   ← Case M 的修改目标（export default）
+│   └── index.ts         ← Case H / H2 / H3（re-export + barrel file + export *）
 │
 ├── hooks/
 │   └── useCart.ts        → imports { calculateTotal, TAX_RATE } from calculator
@@ -29,17 +30,19 @@ src/
 │                         → imports { truncateText } from formatter
 │
 ├── services/
-│   ├── orderService.ts   → imports { calculateTotal, calculateTotalWithTax } from calculator
-│   │                     → imports { logInfo, logError, logWarn } from logger
-│   ├── analyticsService.ts → import * as logger from logger  (namespace)
+│   ├── orderService.ts      → imports { calculateTotal, calculateTotalWithTax } from calculator
+│   │                        → imports { logInfo, logError, logWarn } from logger
+│   ├── analyticsService.ts  → import * as logger from logger  ← Case I (namespace)
 │   │                        → imports { calculateTotal } from calculator
-│   ├── discountService.ts  → imports { calculateTotal as calcTotal, TAX_RATE as taxRate } ← Case J (符号别名)
+│   ├── discountService.ts   → imports { calculateTotal as calcTotal } ← Case J (符号别名)
 │   │                        → imports { logInfo as log } from logger
-│   ├── reportService.ts    → imports from '@/utils/calculator'  ← Case K (路径别名 @/)
-│   │                        → imports from '@/utils/formatter'
-│   │                        → imports from '@/utils/logger'
-│   └── pricingAdapter.ts   → imports { calculateTotal as computeSubtotal } from '@/utils/calculator' ← Case L (组合)
-│                            → imports { logInfo as info, logWarn as warn } from '@/utils/logger'
+│   ├── reportService.ts     → imports from '@/utils/calculator'  ← Case K (路径别名 @/)
+│   ├── pricingAdapter.ts    → imports { calculateTotal as computeSubtotal } from '@/utils/calculator' ← Case L (组合)
+│   ├── inventoryService.ts  → imports { calculateTotal } from '../utils' ← Case H2 (barrel 间接引用)
+│   ├── invoiceService.ts    → import round from '../utils/mathHelpers' ← Case M (default import)
+│   ├── monitorService.ts    → import * as calc from calculator ← Case I2 (namespace.symbol 模式)
+│   ├── authService.ts       → imports { checkPermission } from permissionService ← Case N (循环引用)
+│   └── permissionService.ts → imports { getCurrentUser } from authService ← Case N (循环引用)
 │
 ├── pages/
 │   └── CheckoutPage.tsx  → imports { TAX_RATE } from calculator
@@ -48,9 +51,19 @@ src/
 ├── app/
 │   └── main.ts           ← Case D 的修改目标（入口文件）
 │
-└── __tests__/
-    ├── calculator.test.ts ← Case E 的修改目标（测试文件）
-    └── logger.test.ts     ← Case E 的修改目标（测试文件）
+├── __tests__/
+│   ├── calculator.test.ts ← Case E 的修改目标（测试文件）
+│   └── logger.test.ts     ← Case E 的修改目标（测试文件）
+│
+└── python_example/       ← Case O (Python 点式相对导入)
+    ├── utils/
+    │   ├── __init__.py       → from .calculator import calculate_total
+    │   ├── calculator.py     ← 修改目标
+    │   └── formatter.py
+    └── services/
+        ├── __init__.py
+        ├── order_service.py  → from ..utils.calculator import calculate_total as calc_total
+        └── report_service.py → from ..utils import calculate_total
 ```
 
 ---
@@ -741,6 +754,337 @@ import { logInfo as info, logWarn as warn } from '@/utils/logger'
 
 ---
 
+## Case H2：Barrel file 间接引用 → 步骤 5.5 传递追踪
+
+### 修改目标
+
+`src/utils/calculator.ts` — 修改 `calculateTotal` 的函数签名（与 Case A 相同）
+
+### 背景
+
+`src/services/inventoryService.ts` 通过 barrel file `utils/index.ts` 间接导入 `calculateTotal`：
+
+```typescript
+import { calculateTotal, formatPrice, logInfo } from '../utils'
+```
+
+`../utils` 解析到 `src/utils/index.ts`，而 `index.ts` 通过 `export { calculateTotal } from './calculator'` re-export 了 `calculateTotal`。
+
+### 预期行为
+
+**Step 2~5** — `inventoryService.ts` 的 import `../utils` 解析到 `src/utils/index.ts`。由于 `index.ts` 不在 `allModifiedSymbols` 中（被修改的是 `calculator.ts`），直接依赖图**不包含** `inventoryService.ts`。
+
+**Step 5.5（新增）** — Barrel file 传递追踪：
+
+1. `index.ts` 已在依赖图中（作为 `calculator.ts` 的 dependent）
+2. 检测到 `index.ts` 包含 `export { calculateTotal } from './calculator'` → 标记为 barrel file
+3. 扫描所有已获取文件，发现 `inventoryService.ts` import 了 `../utils`（解析到 `index.ts`）
+4. 将 `inventoryService.ts` 加入 `calculator.ts` 的依赖图
+
+```
+dependency analysis [step 5.5]: src/utils/calculator.ts has 1 barrel file(s): [src/utils/index.ts]
+dependency analysis [step 5.5]: ✓ barrel passthrough: src/services/inventoryService.ts imports {calculateTotal, formatPrice, logInfo} from barrel src/utils/index.ts ← src/utils/calculator.ts
+```
+
+**Step 6** — 引用搜索在 `inventoryService.ts` 中找到 `calculateTotal` 的调用：
+
+| 文件                  | 行   | 内容                                           |
+| --------------------- | ---- | ---------------------------------------------- |
+| `inventoryService.ts` | ~23  | `const total = calculateTotal(items)`          |
+| `inventoryService.ts` | ~33  | `const totalValue = calculateTotal(items)`     |
+
+### 与 Case F 的区别
+
+|            | Case F                              | Case H2                                          |
+| ---------- | ----------------------------------- | ------------------------------------------------ |
+| barrel 角色 | index.ts 是 dependent（直接引用方）  | index.ts 是 passthrough（中转站）                |
+| 消费者     | 无（只到 index.ts 层级）             | inventoryService.ts（通过 barrel 间接到达）      |
+| 追踪深度   | 1-hop（修改文件 → barrel）           | 2-hop（修改文件 → barrel → 消费者）              |
+| 修复前     | ✓ 检测到 index.ts                   | ✗ 漏掉 inventoryService.ts                       |
+| 修复后     | ✓ 检测到 index.ts                   | ✓ 步骤 5.5 追踪到 inventoryService.ts            |
+
+---
+
+## Case H3：export * from → 通配符 re-export 解析
+
+### 修改目标
+
+`src/utils/mathHelpers.ts` — 修改 `roundPrice` 的函数签名
+
+### 背景
+
+`src/utils/index.ts` 使用通配符 re-export：
+
+```typescript
+export * from './mathHelpers'
+```
+
+### PR diff 模拟
+
+```diff
+-export default function roundPrice(amount: number, decimals = 2): number {
++export default function roundPrice(amount: number, decimals = 2, mode: 'round' | 'floor' | 'ceil' = 'round'): number {
+```
+
+### 预期行为
+
+**Step 5** — `export * from './mathHelpers'` 被 `parseTsImports` 的 `exportStarRe` 正则匹配，解析为 `importPath: './mathHelpers'`，`isNamespace: true`。`index.ts` 被加入 `mathHelpers.ts` 的依赖图。
+
+**Step 5.5** — barrel passthrough 同样适用：通过 `index.ts` 间接 import mathHelpers 函数的文件也会被追踪。
+
+---
+
+## Case I2：namespace import → namespaceName.symbolName 精确搜索
+
+### 修改目标
+
+`src/utils/calculator.ts` — 修改 `calculateTotal` 的函数签名
+
+### 背景
+
+`src/services/monitorService.ts` 使用 namespace import：
+
+```typescript
+import * as calc from '../utils/calculator'
+
+const total = calc.calculateTotal(items)
+const formatted = calc.formatPrice(total)
+```
+
+### PR diff 模拟
+
+与 Case A 相同。
+
+### 预期行为
+
+**Step 5** — `import * as calc` 被解析为 `isNamespace: true`，`importedSymbols: ['calc']`。dep entry 记录 `namespaceName: 'calc'`。
+
+**Step 6（增强）** — 引用搜索：
+
+1. `dep.symbols = ['calc']` 与 `symbolNames = ['calculateTotal']` 无交集 → fallback 到全量搜索
+2. **新增**：检测到 `dep.namespaceName = 'calc'`，构建 `calc.calculateTotal` 加入搜索列表
+3. 搜索 `\bcalc\.calculateTotal\b` → 精确匹配 `calc.calculateTotal(items)`
+
+| 文件                 | 行   | 内容                                              | 匹配方式                |
+| -------------------- | ---- | ------------------------------------------------- | ----------------------- |
+| `monitorService.ts`  | ~29  | `const orderTotal = calc.calculateTotal(orderItems)` | namespace.symbol 匹配 |
+| `monitorService.ts`  | ~47  | `const totalBefore = calc.calculateTotal(before)`    | namespace.symbol 匹配 |
+| `monitorService.ts`  | ~48  | `const totalAfter = calc.calculateTotal(after)`      | namespace.symbol 匹配 |
+
+### 与 Case I 的区别
+
+|            | Case I                             | Case I2                                    |
+| ---------- | ---------------------------------- | ------------------------------------------ |
+| 搜索方式   | fallback 全量搜索原始符号名        | 构建 `namespaceName.symbolName` 精确搜索   |
+| 精度       | 可能产生假阳性（如同名局部变量）   | 精确匹配 `calc.calculateTotal` 模式         |
+| 修复前     | ✓ 能找到（靠 fallback）            | ✓ 能找到但可能有误报                        |
+| 修复后     | ✓ 不变                             | ✓ 增加精确 namespace 模式搜索              |
+
+---
+
+## Case M：default import → 本地名引用追踪
+
+### 修改目标
+
+`src/utils/mathHelpers.ts` — 修改 `roundPrice`（default export）的签名
+
+### 背景
+
+`src/services/invoiceService.ts` 使用 default import：
+
+```typescript
+import round from '../utils/mathHelpers'
+
+const tax = round(subtotal * TAX_RATE)
+```
+
+消费者使用本地名 `round`，而原始导出名是 `roundPrice`。
+
+### PR diff 模拟
+
+```diff
+-export default function roundPrice(amount: number, decimals = 2): number {
++export default function roundPrice(amount: number, decimals = 2, mode: 'round' | 'floor' | 'ceil' = 'round'): number {
+   const factor = Math.pow(10, decimals)
+-  return Math.round(amount * factor) / factor
++  const fn = mode === 'floor' ? Math.floor : mode === 'ceil' ? Math.ceil : Math.round
++  return fn(amount * factor) / factor
+ }
+```
+
+### 预期行为
+
+**Step 1** — 提取符号：`roundPrice` (function, exported)
+
+**Step 2~5** — `invoiceService.ts` 的 `import round from '../utils/mathHelpers'` 被解析：
+- `importedSymbols: ['round']`, `isDefault: true`
+- dep entry: `{ file: 'invoiceService.ts', symbols: ['round'], defaultImportName: 'round' }`
+
+**Step 6（增强）** — 引用搜索：
+
+1. `dep.symbols = ['round']` 与 `symbolNames = ['roundPrice']` 无交集 → fallback
+2. **新增**：检测到 `dep.defaultImportName = 'round'`，将 `round` 加入搜索列表
+3. 搜索 `\bround\b` → 找到所有使用 `round()` 的地方
+
+| 文件                | 行   | 内容                                                  | 匹配方式        |
+| ------------------- | ---- | ----------------------------------------------------- | --------------- |
+| `invoiceService.ts` | ~31  | `const tax = round(subtotal * TAX_RATE)`              | default 本地名  |
+| `invoiceService.ts` | ~32  | `const total = round(subtotal + tax)`                 | default 本地名  |
+| `invoiceService.ts` | ~36  | `subtotal: formatPrice(round(subtotal)),`             | default 本地名  |
+| `invoiceService.ts` | ~47  | `const discountAmount = round(subtotal * discount)`   | default 本地名  |
+| `invoiceService.ts` | ~48  | `const afterDiscount = round(subtotal - discountAmount)` | default 本地名 |
+
+**注入的跨文件上下文**：
+
+```markdown
+### Modified exports in this file:
+- `roundPrice` (function)
+
+### Files that import from this file (1):
+- src/services/invoiceService.ts
+
+### References to modified symbols:
+- src/services/invoiceService.ts:31: const tax = round(subtotal * TAX_RATE)
+- src/services/invoiceService.ts:32: const total = round(subtotal + tax)
+- src/services/invoiceService.ts:36: subtotal: formatPrice(round(subtotal)),
+- src/services/invoiceService.ts:47: const discountAmount = round(subtotal * discount)
+- src/services/invoiceService.ts:48: const afterDiscount = round(subtotal - discountAmount)
+```
+
+**AI 审查预期输出**：
+
+> `roundPrice` 新增了可选参数 `mode`，`invoiceService.ts` 通过 default import 别名 `round` 调用了 5 次。当前所有调用使用默认的 `'round'` 模式，无需修改，但建议在财务计算场景中确认是否需要使用 `'floor'` 或 `'ceil'` 模式以避免精度偏差。
+
+### 修复前后对比
+
+|            | 修复前                                  | 修复后                                      |
+| ---------- | --------------------------------------- | ------------------------------------------- |
+| 依赖检测   | ✓ invoiceService.ts 在依赖图中         | ✓ 不变                                      |
+| 引用搜索   | ✗ 搜索 `roundPrice` 找不到 `round`    | ✓ 通过 `defaultImportName` 搜索 `round`    |
+
+---
+
+## Case N：循环引用 → 保护机制
+
+### 修改目标
+
+`src/services/authService.ts` — 修改 `getCurrentUser` 的签名
+
+### 背景
+
+`authService.ts` 和 `permissionService.ts` 形成循环引用：
+
+```
+authService.ts ──import──→ permissionService.ts（checkPermission）
+      ↑                           │
+      └────────import─────────────┘ （getCurrentUser）
+```
+
+### PR diff 模拟
+
+```diff
+-export function getCurrentUser(): User | null {
+-  return currentUser
++export function getCurrentUser(): User | null {
++  if (!currentUser) {
++    logWarn('getCurrentUser called but no user is logged in')
++  }
++  return currentUser
+ }
+```
+
+### 预期行为
+
+**Step 1** — 提取符号：`getCurrentUser` (function)
+
+**Step 2~5** — 发现 `permissionService.ts` import 了 `getCurrentUser` from `authService.ts`
+
+**Step 6（增强）** — 循环引用保护：
+
+1. `deps` 中包含 `permissionService.ts`
+2. 如果 `authService.ts` 也 import 了 `permissionService.ts` 的符号，`authService.ts` 本身**不会**出现在自己的 deps 中（因为修改的文件不会被加入自己的依赖图）
+3. `dep.file === modifiedFile` 的条目被跳过 → 防止自引用循环
+
+引用搜索结果：
+
+| 文件                    | 行   | 内容                                          |
+| ----------------------- | ---- | --------------------------------------------- |
+| `permissionService.ts`  | ~39  | `const user = getCurrentUser()`               |
+| `permissionService.ts`  | ~49  | `const user = getCurrentUser()`               |
+
+### 循环引用不影响分析的原因
+
+当前分析是 1-hop：只查找"谁 import 了被修改文件"，不会递归追踪"import 了被修改文件的文件又被谁 import"。因此循环引用不会导致无限循环。步骤 6 的 `dep.file === modifiedFile` 保护是防御性编程，确保未来扩展 N-hop 时也不会出问题。
+
+---
+
+## Case O：Python 点式相对导入 + __init__.py
+
+### 修改目标
+
+`src/python_example/utils/calculator.py` — 修改 `calculate_total` 的签名
+
+### 背景
+
+Python 使用点式相对导入，与 JS/TS 的 `./` `../` 不同：
+
+```python
+# order_service.py
+from ..utils.calculator import calculate_total as calc_total  # 两个点 = 父目录
+
+# report_service.py
+from ..utils import calculate_total  # 通过 __init__.py 间接导入
+```
+
+### PR diff 模拟
+
+```diff
+-def calculate_total(items):
+-    """计算购物车总价"""
+-    return sum(item["price"] * item["quantity"] for item in items)
++def calculate_total(items, coupon=None):
++    """计算购物车总价（支持优惠券）"""
++    subtotal = sum(item["price"] * item["quantity"] for item in items)
++    if coupon:
++        return subtotal * (1 - coupon["discount"])
++    return subtotal
+```
+
+### 预期行为
+
+**Step 1** — 提取符号：`calculate_total` (function)
+
+**parsePyImports 路径转换**：
+
+| 原始 importPath | 转换后            | 含义               |
+| --------------- | ----------------- | ------------------ |
+| `..utils.calculator` | `../utils/calculator` | 父目录的 utils/calculator |
+| `..utils`       | `../utils`        | 父目录的 utils（→ `__init__.py`）|
+| `.calculator`   | `./calculator`    | 当前目录的 calculator |
+
+**resolveImportPath 解析**：
+
+| 文件                    | 导入路径              | 转换后               | 解析结果                                  |
+| ----------------------- | --------------------- | -------------------- | ----------------------------------------- |
+| `services/order_service.py` | `..utils.calculator` | `../utils/calculator` | `src/python_example/utils/calculator.py` |
+| `services/report_service.py` | `..utils`          | `../utils`           | `src/python_example/utils/__init__.py`   |
+
+**tryResolveWithExtensions 增强**：
+
+- 扩展名列表增加 `.py`
+- index 文件列表增加 `/__init__.py`
+
+**Step 6** — 引用搜索：
+
+| 文件                 | 行   | 内容                                                    | 备注         |
+| -------------------- | ---- | ------------------------------------------------------- | ------------ |
+| `order_service.py`   | ~16  | `subtotal = calc_total(items)`                          | 别名 calc_total |
+| `order_service.py`   | ~25  | `total_revenue = sum(calc_total(order["items"]) ...)`  | 别名 calc_total |
+
+**注意**：`report_service.py` 通过 `from ..utils import calculate_total` 间接导入（经 `__init__.py`），属于 barrel file 场景（Case H2），需要步骤 5.5 的 barrel passthrough 才能追踪。
+
+---
+
 ## 测试执行方法
 
 ### 方法 1：创建真实 PR
@@ -784,6 +1128,11 @@ injected cross-file context for src/utils/calculator.ts: 342 tokens
 | 修改 `logger.ts` (logInfo) + 修改 `main.ts` (APP_VERSION) + 修改 `calculator.test.ts` | G + D + E   |
 | 修改 `validator.ts` (validateEmail) + 修改 `logger.ts` (setLogLevel)                  | F + I       |
 | 修改 `calculator.ts` (calculateTotal) — 验证 discountService/reportService/pricingAdapter | A + J + K + L |
+| 修改 `calculator.ts` — 验证 barrel file 间接引用追踪                                        | A + H2        |
+| 修改 `mathHelpers.ts` (roundPrice) — 验证 default import + barrel export *                   | M + H3        |
+| 修改 `authService.ts` (getCurrentUser) — 验证循环引用保护                                     | N             |
+| 修改 `calculator.ts` — 验证 namespace.symbol 精确搜索                                        | A + I2        |
+| 修改 `calculator.py` — 验证 Python 点式导入 + __init__.py                                    | O             |
 
 ---
 
@@ -800,10 +1149,14 @@ injected cross-file context for src/utils/calculator.ts: 342 tokens
 
 ## 已知局限
 
-1. **仅 TS/JS 有效**：`resolveImportPath` 只处理相对路径和常见别名前缀，Python/Go/Java 的绝对导入无法解析
-2. **不追踪 re-export 链**：通过 `index.ts` 间接导入的关系只能解析到 `index.ts` 本身
-3. **namespace import 精度低**：`import * as X` 时无法知道具体使用了哪些符号，fallback 到全量搜索
-4. ~~**tsconfig paths 不支持**：如 `@/utils/calculator` 这类别名路径无法解析~~ → **已修复**（Case K/L），支持 `@/`、`~/`、`#/` 前缀
-5. ~~**符号别名不追踪**：`import { foo as bar }` 时只搜索原始名 `foo`，找不到 `bar` 的使用~~ → **已修复**（Case J/L），通过 `aliasMap` 同时搜索原始名和别名
-6. **自定义 tsconfig paths 不支持**：非 `@/~/# ` 前缀的自定义路径映射（如 `@lib/xxx`、`@components/xxx`）暂不支持，需读取 tsconfig.json
-7. **namespace 解构别名**：`const { foo: bar } = utils` 需要数据流分析，暂不支持
+1. ~~**仅 TS/JS 有效**~~ → **已修复**（Case O），Python 点式相对导入（`.module`、`..module`）已支持转换，`__init__.py` 已加入 index 文件解析
+2. ~~**不追踪 re-export 链**~~ → **已修复**（Case H2），步骤 5.5 实现 barrel file 1-hop 传递追踪，零额外 API 调用
+3. ~~**namespace import 精度低**~~ → **已改善**（Case I2），新增 `namespaceName.symbolName` 精确搜索模式
+4. ~~**tsconfig paths 不支持**~~ → **已修复**（Case K/L），支持 `@/`、`~/`、`#/` 前缀
+5. ~~**符号别名不追踪**~~ → **已修复**（Case J/L），通过 `aliasMap` 同时搜索原始名和别名
+6. ~~**default import 引用丢失**~~ → **已修复**（Case M），通过 `defaultImportName` 搜索本地名
+7. ~~**循环引用无保护**~~ → **已修复**（Case N），step 6 跳过 `dep.file === modifiedFile`
+8. **自定义 tsconfig paths 不支持**：非 `@/~/# ` 前缀的自定义路径映射（如 `@lib/xxx`、`@components/xxx`）暂不支持，需读取 tsconfig.json
+9. **namespace 解构别名**：`const { foo: bar } = utils` 需要数据流分析，暂不支持
+10. **N-hop 传递依赖**：当前只支持 1-hop barrel passthrough，更深层的传递链暂不追踪
+11. **动态导入**：`await import('./module')` 和 `React.lazy()` 暂不解析
