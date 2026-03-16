@@ -17,8 +17,16 @@ const LOG_PRIORITY: Record<LogLevel, number> = {
 };
 
 /** 设置日志级别 */
-export function setLogLevel(level: LogLevel): void {
+// export function setLogLevel(level: LogLevel): void {
+//   currentLogLevel = level;
+// }
+
+// Case I：namespace import → 引用搜索 fallback
+export function setLogLevel(level: LogLevel, persist = false): void {
   currentLogLevel = level;
+  if (persist) {
+    localStorage.setItem("log_level", level);
+  }
 }
 
 /** 通用日志函数 */
