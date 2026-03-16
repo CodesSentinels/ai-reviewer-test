@@ -5,21 +5,21 @@
  */
 
 /** 验证邮箱格式 */
-// export function validateEmail(email: string): boolean {
-//   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
-// }
+export function validateEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
 
 // Case F：有导出符号但无文件引用 → 引用搜索为空
-export function validateEmail(email: string): {
-  valid: boolean;
-  reason?: string;
-} {
-  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!re.test(email)) {
-    return { valid: false, reason: "邮箱格式不正确" };
-  }
-  return { valid: true };
-}
+// export function validateEmail(email: string): {
+//   valid: boolean;
+//   reason?: string;
+// } {
+//   const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+//   if (!re.test(email)) {
+//     return { valid: false, reason: "邮箱格式不正确" };
+//   }
+//   return { valid: true };
+// }
 
 /** 验证手机号 */
 export function validatePhone(phone: string): string | null {
