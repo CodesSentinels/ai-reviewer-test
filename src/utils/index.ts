@@ -6,13 +6,26 @@
  * 测试 Case H3: export * from → 通配符 re-export 被正确解析
  */
 
-export { calculateTotal, calculateTotalWithTax, formatPrice, TAX_RATE } from './calculator'
-export type { CartItem, Coupon } from './calculator'
-export { formatDate, formatPercent, truncateText } from './formatter'
-export { validateEmail, validatePhone, validatePassword } from './validator'
-export { log, logInfo, logWarn, logError, logDebug, setLogLevel } from './logger'
-export type { LogLevel } from './logger'
+export {
+  calculateTotal,
+  calculateTotalWithTax,
+  formatPrice,
+  TAX_RATE,
+} from "./calculator";
+export { roundToTwo } from "./calculator";
+export type { CartItem, Coupon } from "./calculator";
+export { formatDate, formatPercent, truncateText } from "./formatter";
+export { validateEmail, validatePhone, validatePassword } from "./validator";
+export {
+  log,
+  logInfo,
+  logWarn,
+  logError,
+  logDebug,
+  setLogLevel,
+} from "./logger";
+export type { LogLevel } from "./logger";
 
 // Case H3: export * from — 通配符 re-export
 // mathHelpers 的所有导出（包括 default export roundPrice）通过 * 重新导出
-export * from './mathHelpers'
+export * from "./mathHelpers";
