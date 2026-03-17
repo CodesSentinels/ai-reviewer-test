@@ -1156,7 +1156,8 @@ injected cross-file context for src/utils/calculator.ts: 342 tokens
 5. ~~**符号别名不追踪**~~ → **已修复**（Case J/L），通过 `aliasMap` 同时搜索原始名和别名
 6. ~~**default import 引用丢失**~~ → **已修复**（Case M），通过 `defaultImportName` 搜索本地名
 7. ~~**循环引用无保护**~~ → **已修复**（Case N），step 6 跳过 `dep.file === modifiedFile`
-8. **自定义 tsconfig paths 不支持**：非 `@/~/# ` 前缀的自定义路径映射（如 `@lib/xxx`、`@components/xxx`）暂不支持，需读取 tsconfig.json
-9. **namespace 解构别名**：`const { foo: bar } = utils` 需要数据流分析，暂不支持
-10. **N-hop 传递依赖**：当前只支持 1-hop barrel passthrough，更深层的传递链暂不追踪
-11. **动态导入**：`await import('./module')` 和 `React.lazy()` 暂不解析
+8. ~~**re-export 行假阳性**~~ → **已修复**（Case G），`findReferencesInContent` 现在跳过 `export { ... } from`、`export * from` 和多行 `import { ... }` 块中的行，避免将 re-export 声明误报为引用
+9. **自定义 tsconfig paths 不支持**：非 `@/~/# ` 前缀的自定义路径映射（如 `@lib/xxx`、`@components/xxx`）暂不支持，需读取 tsconfig.json
+10. **namespace 解构别名**：`const { foo: bar } = utils` 需要数据流分析，暂不支持
+11. **N-hop 传递依赖**：当前只支持 1-hop barrel passthrough，更深层的传递链暂不追踪
+12. **动态导入**：`await import('./module')` 和 `React.lazy()` 暂不解析
