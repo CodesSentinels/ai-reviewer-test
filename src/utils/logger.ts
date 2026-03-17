@@ -46,18 +46,18 @@ export function logDebug(msg: string, ...args: unknown[]): void {
   log("debug", msg, ...args);
 }
 
-export function logInfo(msg: string, ...args: unknown[]): void {
-  log("info", msg, ...args);
-}
+// export function logInfo(msg: string, ...args: unknown[]): void {
+//   log("info", msg, ...args);
+// }
 
 // Case G：多文件导入同一模块 → 去重 + 多引用聚合
-// export function logInfo(
-//   msg: string,
-//   context?: string,
-//   ...args: unknown[]
-// ): void {
-//   log("info", context ? `[${context}] ${msg}` : msg, ...args);
-// }
+export function logInfo(
+  msg: string,
+  context?: string,
+  ...args: unknown[]
+): void {
+  log("info", context ? `[${context}] ${msg}` : msg, ...args);
+}
 
 export function logWarn(msg: string, ...args: unknown[]): void {
   log("warn", msg, ...args);
