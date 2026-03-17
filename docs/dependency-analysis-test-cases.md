@@ -449,8 +449,6 @@ dependency analysis [summary]: 1 files have external references, 0 files have no
 
 ## Case G：多文件导入同一模块 → 去重 + 多引用聚合
 
-### 日志中可以看到检索到了多个导入同一模块的文件，但没有写入评论，@TODO 待确认是否需要写入到评论中
-
 ### 修改目标
 
 `src/utils/logger.ts` — 修改 `logInfo` 的签名
@@ -1095,6 +1093,53 @@ from ..utils import calculate_total  # 通过 __init__.py 间接导入
 
 ---
 
+## PR 评论中的依赖分析摘要
+
+当 `enable_dependency_analysis` 开启时，无论是否发现跨文件引用影响，PR 摘要评论中都会展示依赖分析结果区块，让用户了解分析覆盖范围。
+
+### 输出格式
+
+摘要评论中会新增一个可折叠的 `Cross-file dependency analysis` 区块：
+
+```markdown
+<details>
+<summary>Cross-file dependency analysis (N files)</summary>
+
+**src/utils/calculator.ts**
+- Modified exports: `calculateTotal` (function)
+- Referenced by 5 files:
+  - src/hooks/useCart.ts → `calculateTotal`
+  - src/components/CartSummary.tsx → `calculateTotal`
+  - src/components/CheckoutForm.tsx → `calculateTotal`
+  - src/services/orderService.ts → `calculateTotal`
+  - src/services/analyticsService.ts → `calculateTotal`
+
+**src/utils/formatter.ts**
+- Modified exports: `padZero` (function)
+- No cross-file references affected
+
+</details>
+```
+
+### 三种输出场景
+
+| 场景 | 输出内容 | 示例 |
+| --- | --- | --- |
+| 有导出符号被修改且有引用 | 显示符号列表 + 引用方文件和符号 | Case A / G |
+| 有导出符号被修改但无引用 | 显示符号列表 + "No cross-file references affected" | Case C（内部函数不展示）、孤立模块 |
+| 无导出符号被修改 | 显示 "No exported symbols modified" + "No cross-file references affected" | 仅修改内部逻辑的文件 |
+
+### 与跨文件上下文注入的区别
+
+| | PR 评论摘要（`formatDependencySummary`） | 审查提示词注入（`formatCrossFileContext`） |
+| --- | --- | --- |
+| 用途 | 给 PR 作者/审查者看，了解影响范围 | 给 AI 模型看，辅助代码审查 |
+| 触发条件 | `enable_dependency_analysis` 开启即展示 | 有引用且 token 预算内才注入 |
+| 展示位置 | PR 摘要评论（issue comment） | 审查提示词（不可见） |
+| 信息粒度 | 按文件分组，显示符号和引用方 | 包含引用行号和代码内容 |
+
+---
+
 ## 测试执行方法
 
 ### 方法 1：创建真实 PR
@@ -1150,7 +1195,7 @@ injected cross-file context for src/utils/calculator.ts: 342 tokens
 
 | 参数                         | 默认值  | 说明                                  |
 | ---------------------------- | ------- | ------------------------------------- |
-| `enable_dependency_analysis` | `true`  | 启用/禁用跨文件依赖分析               |
+| `enable_dependency_analysis` | `true`  | 启用/禁用跨文件依赖分析（开启后 PR 摘要评论始终展示分析结果） |
 | `max_dependency_files`       | `50`    | 最大扫描外部文件数                    |
 | `path_filters`               | 无      | 文件过滤规则，依赖分析也遵守          |
 | `debug`                      | `false` | 开启后可在 Actions 日志中查看分析详情 |
@@ -1167,7 +1212,10 @@ injected cross-file context for src/utils/calculator.ts: 342 tokens
 6. ~~**default import 引用丢失**~~ → **已修复**（Case M），通过 `defaultImportName` 搜索本地名
 7. ~~**循环引用无保护**~~ → **已修复**（Case N），step 6 跳过 `dep.file === modifiedFile`
 8. ~~**re-export 行假阳性**~~ → **已修复**（Case G），`findReferencesInContent` 现在跳过 `export { ... } from`、`export * from` 和多行 `import { ... }` 块中的行，避免将 re-export 声明误报为引用
-9. **自定义 tsconfig paths 不支持**：非 `@/~/# ` 前缀的自定义路径映射（如 `@lib/xxx`、`@components/xxx`）暂不支持，需读取 tsconfig.json
-10. **namespace 解构别名**：`const { foo: bar } = utils` 需要数据流分析，暂不支持
-11. **N-hop 传递依赖**：当前只支持 1-hop barrel passthrough，更深层的传递链暂不追踪
-12. **动态导入**：`await import('./module')` 和 `React.lazy()` 暂不解析
+9. ~~**空审查提交报错**~~ → **已修复**，当没有审查评论时跳过 `createReview` API 调用，避免 GitHub API 返回 HttpError
+10. ~~**并发运行导致重复评论**~~ → **已修复**，`replace()` 方法现在查找所有匹配标签的评论，更新第一条并删除多余的重复评论
+11. ~~**依赖分析结果不展示**~~ → **已修复**，PR 摘要评论中新增 `Cross-file dependency analysis` 折叠区块，即使没有跨文件引用也会展示分析覆盖范围
+12. **自定义 tsconfig paths 不支持**：非 `@/~/# ` 前缀的自定义路径映射（如 `@lib/xxx`、`@components/xxx`）暂不支持，需读取 tsconfig.json
+13. **namespace 解构别名**：`const { foo: bar } = utils` 需要数据流分析，暂不支持
+14. **N-hop 传递依赖**：当前只支持 1-hop barrel passthrough，更深层的传递链暂不追踪
+15. **动态导入**：`await import('./module')` 和 `React.lazy()` 暂不解析
