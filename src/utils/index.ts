@@ -12,6 +12,7 @@ export {
   formatPrice,
   TAX_RATE,
 } from "./calculator";
+export { roundToTwo } from "./calculator";
 export type { CartItem, Coupon } from "./calculator";
 export { formatDate, formatPercent, truncateText } from "./formatter";
 export { validateEmail, validatePhone, validatePassword } from "./validator";
