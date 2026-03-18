@@ -17,17 +17,20 @@ const LOG_PRIORITY: Record<LogLevel, number> = {
 };
 
 /** 设置日志级别 */
-export function setLogLevel(level: LogLevel): void {
-  currentLogLevel = level;
-}
-
-// Case I：namespace import → 引用搜索 fallback
-// export function setLogLevel(level: LogLevel, persist = false): void {
+// export function setLogLevel(level: LogLevel): void {
 //   currentLogLevel = level;
-//   if (persist) {
-//     localStorage.setItem("log_level", level);
-//   }
 // }
+
+// Case I：namespace import → 引用搜索 fallback （TODO 出现同样的代码，多次review结果不同）
+// 1.https://github.com/CodesSentinels/ai-reviewer-test/pull/42
+// 2.https://github.com/CodesSentinels/ai-reviewer-test/pull/43
+// 3.https://github.com/CodesSentinels/ai-reviewer-test/pull/44
+export function setLogLevel(level: LogLevel, persist = false): void {
+  currentLogLevel = level;
+  if (persist) {
+    localStorage.setItem("log_level", level);
+  }
+}
 
 /** 通用日志函数 */
 export function log(
