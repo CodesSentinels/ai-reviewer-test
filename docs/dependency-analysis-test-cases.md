@@ -838,141 +838,7 @@ export * from './mathHelpers'
 
 ---
 
-## Case I2：namespace import → namespaceName.symbolName 精确搜索
-
-### 修改目标
-
-`src/utils/calculator.ts` — 修改 `calculateTotal` 的函数签名
-
-### 背景
-
-`src/services/monitorService.ts` 使用 namespace import：
-
-```typescript
-import * as calc from '../utils/calculator'
-
-const total = calc.calculateTotal(items)
-const formatted = calc.formatPrice(total)
-```
-
-### PR diff 模拟
-
-与 Case A 相同。
-
-### 预期行为
-
-**Step 5** — `import * as calc` 被解析为 `isNamespace: true`，`importedSymbols: ['calc']`。dep entry 记录 `namespaceName: 'calc'`。
-
-**Step 6（增强）** — 引用搜索：
-
-1. `dep.symbols = ['calc']` 与 `symbolNames = ['calculateTotal']` 无交集 → fallback 到全量搜索
-2. **新增**：检测到 `dep.namespaceName = 'calc'`，构建 `calc.calculateTotal` 加入搜索列表
-3. 搜索 `\bcalc\.calculateTotal\b` → 精确匹配 `calc.calculateTotal(items)`
-
-| 文件                | 行  | 内容                                                 | 匹配方式              |
-| ------------------- | --- | ---------------------------------------------------- | --------------------- |
-| `monitorService.ts` | ~29 | `const orderTotal = calc.calculateTotal(orderItems)` | namespace.symbol 匹配 |
-| `monitorService.ts` | ~47 | `const totalBefore = calc.calculateTotal(before)`    | namespace.symbol 匹配 |
-| `monitorService.ts` | ~48 | `const totalAfter = calc.calculateTotal(after)`      | namespace.symbol 匹配 |
-
-### 与 Case I 的区别
-
-|          | Case I                           | Case I2                                  |
-| -------- | -------------------------------- | ---------------------------------------- |
-| 搜索方式 | fallback 全量搜索原始符号名      | 构建 `namespaceName.symbolName` 精确搜索 |
-| 精度     | 可能产生假阳性（如同名局部变量） | 精确匹配 `calc.calculateTotal` 模式      |
-| 修复前   | ✓ 能找到（靠 fallback）          | ✓ 能找到但可能有误报                     |
-| 修复后   | ✓ 不变                           | ✓ 增加精确 namespace 模式搜索            |
-
----
-
-## Case M：default import → 本地名引用追踪
-
-### 修改目标
-
-`src/utils/mathHelpers.ts` — 修改 `roundPrice`（default export）的签名
-
-### 背景
-
-`src/services/invoiceService.ts` 使用 default import：
-
-```typescript
-import round from '../utils/mathHelpers'
-
-const tax = round(subtotal * TAX_RATE)
-```
-
-消费者使用本地名 `round`，而原始导出名是 `roundPrice`。
-
-### PR diff 模拟
-
-```diff
--export default function roundPrice(amount: number, decimals = 2): number {
-+export default function roundPrice(amount: number, decimals = 2, mode: 'round' | 'floor' | 'ceil' = 'round'): number {
-   const factor = Math.pow(10, decimals)
--  return Math.round(amount * factor) / factor
-+  const fn = mode === 'floor' ? Math.floor : mode === 'ceil' ? Math.ceil : Math.round
-+  return fn(amount * factor) / factor
- }
-```
-
-### 预期行为
-
-**Step 1** — 提取符号：`roundPrice` (function, exported)
-
-**Step 2~5** — `invoiceService.ts` 的 `import round from '../utils/mathHelpers'` 被解析：
-
-- `importedSymbols: ['round']`, `isDefault: true`
-- dep entry: `{ file: 'invoiceService.ts', symbols: ['round'], defaultImportName: 'round' }`
-
-**Step 6（增强）** — 引用搜索：
-
-1. `dep.symbols = ['round']` 与 `symbolNames = ['roundPrice']` 无交集 → fallback
-2. **新增**：检测到 `dep.defaultImportName = 'round'`，将 `round` 加入搜索列表
-3. 搜索 `\bround\b` → 找到所有使用 `round()` 的地方
-
-| 文件                | 行  | 内容                                                     | 匹配方式       |
-| ------------------- | --- | -------------------------------------------------------- | -------------- |
-| `invoiceService.ts` | ~31 | `const tax = round(subtotal * TAX_RATE)`                 | default 本地名 |
-| `invoiceService.ts` | ~32 | `const total = round(subtotal + tax)`                    | default 本地名 |
-| `invoiceService.ts` | ~36 | `subtotal: formatPrice(round(subtotal)),`                | default 本地名 |
-| `invoiceService.ts` | ~47 | `const discountAmount = round(subtotal * discount)`      | default 本地名 |
-| `invoiceService.ts` | ~48 | `const afterDiscount = round(subtotal - discountAmount)` | default 本地名 |
-
-**注入的跨文件上下文**：
-
-```markdown
-### Modified exports in this file:
-
-- `roundPrice` (function)
-
-### Files that import from this file (1):
-
-- src/services/invoiceService.ts
-
-### References to modified symbols:
-
-- src/services/invoiceService.ts:31: const tax = round(subtotal \* TAX_RATE)
-- src/services/invoiceService.ts:32: const total = round(subtotal + tax)
-- src/services/invoiceService.ts:36: subtotal: formatPrice(round(subtotal)),
-- src/services/invoiceService.ts:47: const discountAmount = round(subtotal \* discount)
-- src/services/invoiceService.ts:48: const afterDiscount = round(subtotal - discountAmount)
-```
-
-**AI 审查预期输出**：
-
-> `roundPrice` 新增了可选参数 `mode`，`invoiceService.ts` 通过 default import 别名 `round` 调用了 5 次。当前所有调用使用默认的 `'round'` 模式，无需修改，但建议在财务计算场景中确认是否需要使用 `'floor'` 或 `'ceil'` 模式以避免精度偏差。
-
-### 修复前后对比
-
-|          | 修复前                             | 修复后                                  |
-| -------- | ---------------------------------- | --------------------------------------- |
-| 依赖检测 | ✓ invoiceService.ts 在依赖图中     | ✓ 不变                                  |
-| 引用搜索 | ✗ 搜索 `roundPrice` 找不到 `round` | ✓ 通过 `defaultImportName` 搜索 `round` |
-
----
-
-## Case N：循环引用 → 保护机制
+## Case M：循环引用 → 保护机制
 
 ### 修改目标
 
@@ -1106,6 +972,7 @@ from ..utils import calculate_total  # 通过 __init__.py 间接导入
 <summary>Cross-file dependency analysis (N files)</summary>
 
 **src/utils/calculator.ts**
+
 - Modified exports: `calculateTotal` (function)
 - Referenced by 5 files:
   - src/hooks/useCart.ts → `calculateTotal`
@@ -1115,6 +982,7 @@ from ..utils import calculate_total  # 通过 __init__.py 间接导入
   - src/services/analyticsService.ts → `calculateTotal`
 
 **src/utils/formatter.ts**
+
 - Modified exports: `padZero` (function)
 - No cross-file references affected
 
@@ -1123,20 +991,20 @@ from ..utils import calculate_total  # 通过 __init__.py 间接导入
 
 ### 三种输出场景
 
-| 场景 | 输出内容 | 示例 |
-| --- | --- | --- |
-| 有导出符号被修改且有引用 | 显示符号列表 + 引用方文件和符号 | Case A / G |
-| 有导出符号被修改但无引用 | 显示符号列表 + "No cross-file references affected" | Case C（内部函数不展示）、孤立模块 |
-| 无导出符号被修改 | 显示 "No exported symbols modified" + "No cross-file references affected" | 仅修改内部逻辑的文件 |
+| 场景                     | 输出内容                                                                  | 示例                               |
+| ------------------------ | ------------------------------------------------------------------------- | ---------------------------------- |
+| 有导出符号被修改且有引用 | 显示符号列表 + 引用方文件和符号                                           | Case A / G                         |
+| 有导出符号被修改但无引用 | 显示符号列表 + "No cross-file references affected"                        | Case C（内部函数不展示）、孤立模块 |
+| 无导出符号被修改         | 显示 "No exported symbols modified" + "No cross-file references affected" | 仅修改内部逻辑的文件               |
 
 ### 与跨文件上下文注入的区别
 
-| | PR 评论摘要（`formatDependencySummary`） | 审查提示词注入（`formatCrossFileContext`） |
-| --- | --- | --- |
-| 用途 | 给 PR 作者/审查者看，了解影响范围 | 给 AI 模型看，辅助代码审查 |
-| 触发条件 | `enable_dependency_analysis` 开启即展示 | 有引用且 token 预算内才注入 |
-| 展示位置 | PR 摘要评论（issue comment） | 审查提示词（不可见） |
-| 信息粒度 | 按文件分组，显示符号和引用方 | 包含引用行号和代码内容 |
+|          | PR 评论摘要（`formatDependencySummary`） | 审查提示词注入（`formatCrossFileContext`） |
+| -------- | ---------------------------------------- | ------------------------------------------ |
+| 用途     | 给 PR 作者/审查者看，了解影响范围        | 给 AI 模型看，辅助代码审查                 |
+| 触发条件 | `enable_dependency_analysis` 开启即展示  | 有引用且 token 预算内才注入                |
+| 展示位置 | PR 摘要评论（issue comment）             | 审查提示词（不可见）                       |
+| 信息粒度 | 按文件分组，显示符号和引用方             | 包含引用行号和代码内容                     |
 
 ---
 
@@ -1193,12 +1061,12 @@ injected cross-file context for src/utils/calculator.ts: 342 tokens
 
 ## 配置参数参考
 
-| 参数                         | 默认值  | 说明                                  |
-| ---------------------------- | ------- | ------------------------------------- |
+| 参数                         | 默认值  | 说明                                                          |
+| ---------------------------- | ------- | ------------------------------------------------------------- |
 | `enable_dependency_analysis` | `true`  | 启用/禁用跨文件依赖分析（开启后 PR 摘要评论始终展示分析结果） |
-| `max_dependency_files`       | `50`    | 最大扫描外部文件数                    |
-| `path_filters`               | 无      | 文件过滤规则，依赖分析也遵守          |
-| `debug`                      | `false` | 开启后可在 Actions 日志中查看分析详情 |
+| `max_dependency_files`       | `50`    | 最大扫描外部文件数                                            |
+| `path_filters`               | 无      | 文件过滤规则，依赖分析也遵守                                  |
+| `debug`                      | `false` | 开启后可在 Actions 日志中查看分析详情                         |
 
 ---
 
