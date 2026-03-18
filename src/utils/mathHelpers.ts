@@ -9,14 +9,9 @@
  */
 
 /** 四舍五入到指定小数位（默认导出） */
-// export default function roundPrice(amount: number, decimals = 2): number {
-
-// Case H3：export \* from → 通配符 re-export 解析
-export default function roundPrice(
-  amount: number,
-  decimals = 2,
-  mode: "round" | "floor" | "ceil" = "round",
-): number {
+export default function roundPrice(amount: number, decimals = 2): number {
+  // Case H3：export \* from → 通配符 re-export 解析
+  // export default function roundPrice(amount: number, decimals = 2, mode: "round" | "floor" | "ceil" = "round"): number {
   const factor = Math.pow(10, decimals);
   return Math.round(amount * factor) / factor;
 }
