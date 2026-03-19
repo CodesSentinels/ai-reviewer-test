@@ -20,7 +20,8 @@ jobs:
   review:
     runs-on: ubuntu-latest
     steps:
-      - uses: CodesSentinels/ai-reviewer@chore/refactor-and-upgrade
+      - uses: CodesSentinels/ai-reviewer@feature/vue
+        # - uses: CodesSentinels/ai-reviewer@chore/refactor-and-upgrade
         # - uses: CodesSentinels/ai-reviewer@feat/optimize-web-query-prompt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
