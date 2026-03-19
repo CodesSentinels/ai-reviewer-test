@@ -7,7 +7,9 @@
 import { useUserStore } from "~/stores/userStore"
 import { logInfo } from "~/base-layer/utils/logger"
 
-export function useAuth(options?: { redirectOnLogout?: boolean }) {
+export function useAuth() {
+  // 场景 1: Composable 显式导入
+  // export function useAuth(options?: { redirectOnLogout?: boolean }) {
   const userStore = useUserStore()
   const isLoggedIn = computed(() => !!userStore.currentUser)
 
