@@ -13,9 +13,7 @@ import axios from "axios"
 export async function fetchProducts(categoryId: string) {
   const response = await axios.get("/api/products", {
     params: { category: categoryId },
-    timeout: 5000,
-    retryCount: 3,
-    retryDelay: 1000
+    timeout: 5000
   })
   return response.data
 }
