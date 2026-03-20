@@ -9,7 +9,7 @@ import { logInfo } from "~/base-layer/utils/logger"
 export interface User {
   email: string
   name: string
-  avatar?: string
+  // avatar?: string
 }
 
 export const useUserStore = defineStore("user", () => {
