@@ -18,7 +18,7 @@ export async function getProducts(category?: string) {
   let query = supabase.from("products").select("id, name, price, category")
 
   if (category) {
-    query = query.eq("category", category)
+    query = query.eq("category", category).contains("tags", ["featured"])
   }
 
   const { data, error } = await query.order("created_at", { ascending: false })
@@ -32,7 +32,7 @@ export async function getProducts(category?: string) {
 export async function loginUser(email: string, password: string) {
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
-    password,
+    password
   })
 
   if (error) throw error
@@ -40,15 +40,9 @@ export async function loginUser(email: string, password: string) {
 }
 
 // 场景 6: Supabase Realtime — 验证订阅 API
-export function subscribeToProducts(
-  callback: (payload: unknown) => void
-) {
+export function subscribeToProducts(callback: (payload: unknown) => void) {
   return supabase
     .channel("products-changes")
-    .on(
-      "postgres_changes",
-      { event: "*", schema: "public", table: "products" },
-      callback
-    )
+    .on("postgres_changes", { event: "*", schema: "public", table: "products" }, callback)
     .subscribe()
 }
