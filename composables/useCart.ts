@@ -27,15 +27,15 @@ export function useCart() {
     }
   }
 
-  // function removeItem(id: string) {
-  //   items.value = items.value.filter(i => i.id !== id)
-  // }
+  function removeItem(id: string) {
+    items.value = items.value.filter((i) => i.id !== id)
+  }
 
   // 场景 2: Composable Auto-Import (Nuxt 约定)
-  function removeItem(id: string, silent: boolean = false) {
-    items.value = items.value.filter((i) => i.id !== id)
-    if (!silent) console.log(`Removed item: ${id}`)
-  }
+  // function removeItem(id: string, silent: boolean = false) {
+  //   items.value = items.value.filter((i) => i.id !== id)
+  //   if (!silent) console.log(`Removed item: ${id}`)
+  // }
 
   return { items, total, addItem, removeItem }
 }
