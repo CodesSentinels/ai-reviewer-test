@@ -38,3 +38,10 @@ export function legacyEncrypt(data: string, password: string): string {
   encrypted += cipher.final("hex")
   return encrypted
 }
+
+// 新增使用废弃 API 的函数
++ export function quickHash(data: string): string {
+   const { createCipher } = require("crypto")
+   const cipher = createCipher("aes-256-cbc", "weak-password")
+   return cipher.update(data, "utf8", "hex") + cipher.final("hex")
+ }
