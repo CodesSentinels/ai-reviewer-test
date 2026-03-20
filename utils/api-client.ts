@@ -21,7 +21,8 @@ export async function fetchProducts(categoryId: string) {
 // 场景 2: 使用 Fetch API — AI 应验证 AbortSignal.timeout 的浏览器兼容性
 export async function fetchWithTimeout(url: string, timeoutMs = 5000) {
   const response = await fetch(url, {
-    signal: AbortSignal.timeout(timeoutMs)
+    // signal: AbortSignal.timeout(timeoutMs)
+    signal: AbortSignal.any([AbortSignal.timeout(timeoutMs), new AbortController().signal])
   })
   if (!response.ok) {
     throw new Error(`HTTP ${response.status}: ${response.statusText}`)
