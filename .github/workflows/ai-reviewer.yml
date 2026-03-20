@@ -28,5 +28,6 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         with:
           debug: true
-          review_simple_changes: false
+          review_simple_changes: true
           review_comment_lgtm: false
+          enable_web_search: true
