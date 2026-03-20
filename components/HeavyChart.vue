@@ -10,6 +10,7 @@ const props = defineProps<{
   data: number[]
   title: string
   color?: string
+  animate?: boolean
 }>()
 
 const chartStyle = computed(() => ({
