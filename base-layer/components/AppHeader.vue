@@ -6,9 +6,9 @@
  */
 const { isDark } = useTheme()
 
-const emit = defineEmits<{
-  menuToggle: [open: boolean]
-}>()
+// const emit = defineEmits<{
+//   menuToggle: [open: boolean]
+// }>()
 </script>
 
 <template>
