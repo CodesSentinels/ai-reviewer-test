@@ -5,6 +5,10 @@
  * 测试场景 7: 被 layouts/default.vue 使用（Nuxt auto-import component）
  */
 const { isDark } = useTheme()
+
+const emit = defineEmits<{
+  menuToggle: [open: boolean]
+}>()
 </script>
 
 <template>

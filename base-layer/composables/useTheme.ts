@@ -10,7 +10,7 @@ export function useTheme() {
     isDark.value = !isDark.value
   }
 
-  // return { isDark, toggleTheme }
-  const themeColor = computed(() => (isDark.value ? "#1a1a1a" : "#ffffff"))
-  return { isDark, toggleTheme, themeColor }
+  return { isDark, toggleTheme }
+  // const themeColor = computed(() => (isDark.value ? "#1a1a1a" : "#ffffff"))
+  // return { isDark, toggleTheme, themeColor }
 }
