@@ -6,14 +6,15 @@
  * 测试场景 4: 引用 components/ui/BaseButton.vue
  * 测试场景 6: 使用 base-layer composable useTheme
  */
-import BaseButton from '~/components/ui/BaseButton.vue'
-import { formatPrice } from '~/utils/formatPrice'
+import BaseButton from "~/components/ui/BaseButton.vue"
+import { formatPrice } from "~/utils/formatPrice"
 
 const props = defineProps<{
   id: string
   name: string
   price: number
   image: string
+  badge?: string
 }>()
 
 // auto-import from base-layer composables
