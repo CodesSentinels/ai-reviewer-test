@@ -30,7 +30,8 @@ export async function getProducts(category?: string) {
 // 场景 6: Supabase Auth API — v1 语法 vs v2 语法
 // 修改点: 使用 v1 的 signIn 方法（v2 已改为 signInWithPassword）
 export async function loginUser(email: string, password: string) {
-  const { data, error } = await supabase.auth.signInWithPassword({
+  // const { data, error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await supabase.auth.signIn({
     email,
     password
   })
