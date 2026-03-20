@@ -7,7 +7,8 @@
 import Stripe from "stripe"
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "sk_test_xxx", {
-  apiVersion: "2024-12-18.acacia",
+  // apiVersion: "2024-12-18.acacia",
+  apiVersion: "2024-12-18"
 })
 
 // 场景 8: Stripe Webhook 验证 — AI 应验证 constructEvent 参数和签名验证流程
@@ -31,7 +32,7 @@ export default defineEventHandler(async (event) => {
   } catch (err: any) {
     throw createError({
       statusCode: 400,
-      message: `Webhook signature verification failed: ${err.message}`,
+      message: `Webhook signature verification failed: ${err.message}`
     })
   }
 
