@@ -5,9 +5,9 @@
  */
 export function formatPrice(
   amount: number,
-  // currency: string = 'CNY',
+  currency: string = "CNY",
   // 场景 3: 工具函数引用
-  currency: string = "USD",
+  // currency: string = "USD",
   locale: string = "zh-CN"
 ): string {
   return new Intl.NumberFormat(locale, {
