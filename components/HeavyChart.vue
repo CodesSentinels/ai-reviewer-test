@@ -13,7 +13,7 @@ const props = defineProps<{
 }>()
 
 const chartStyle = computed(() => ({
-  '--chart-color': props.color ?? '#3b82f6'
+  "--chart-color": props.color ?? "#3b82f6"
 }))
 </script>
 
