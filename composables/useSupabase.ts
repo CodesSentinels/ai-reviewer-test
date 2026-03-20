@@ -18,7 +18,7 @@ export async function getProducts(category?: string) {
   let query = supabase.from("products").select("id, name, price, category")
 
   if (category) {
-    query = query.eq("category", category).contains("tags", ["featured"])
+    query = query.eq("category", category)
   }
 
   const { data, error } = await query.order("created_at", { ascending: false })
