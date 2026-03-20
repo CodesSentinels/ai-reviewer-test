@@ -20,8 +20,8 @@ export function encryptData(data: string, password: string): string {
   const salt = randomBytes(16)
   const key = scryptSync(password, salt, 32) // 256-bit key for aes-256-cbc
   const iv = randomBytes(16) // AES block size = 16 bytes
-  // const cipher = createCipheriv("aes-256-cbc", key, iv)
-  const cipher = createCipheriv("aes-128-cbc", key, iv)
+  const cipher = createCipheriv("aes-256-cbc", key, iv)
+  // const cipher = createCipheriv("aes-128-cbc", key, iv)
   let encrypted = cipher.update(data, "utf8", "hex")
   encrypted += cipher.final("hex")
   return `${salt.toString("hex")}:${iv.toString("hex")}:${encrypted}`
