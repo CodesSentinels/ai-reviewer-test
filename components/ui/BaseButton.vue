@@ -7,7 +7,7 @@
 const props = defineProps<{
   variant?: "primary" | "secondary" | "danger"
   disabled?: boolean
-  size: "sm" | "md" | "lg"
+  // size: "sm" | "md" | "lg"
 }>()
 
 const emit = defineEmits<{
