@@ -17,8 +17,8 @@ dayjs.extend(timezone)
 // 修改点: 使用错误的格式化 token（如 YYYY-mm-dd 应为 YYYY-MM-DD）
 export function formatDate(
   date: string | Date,
-  // format = "YYYY-MM-DD HH:mm:ss"
-  format = "YYYY-mm-DD HH:MM:ss"
+  format = "YYYY-MM-DD HH:mm:ss"
+  // format = "YYYY-mm-DD HH:MM:ss"
 ): string {
   return dayjs(date).format(format)
 }
