@@ -180,6 +180,8 @@ jobs:
 ```
 
 > 💡 把 `enable_dependency_analysis` 也关掉是**关键技巧**：该功能会预先把跨文件引用贴给模型，导致模型"不需要"跑 shell 就能写出评论。关掉后，模型只能靠 `enable_shell` 拿到跨文件上下文，shell 触发率会显著提高。
+>
+> ⚠️ **默认 path_filters 陷阱**：[action.yml:112](https://github.com/CodesSentinels/ai-reviewer/blob/main/action.yml#L112) 的默认 `path_filters` 排除 `!**/*.json`、`!**/*.yaml`、`!**/*.yml`、`!**/*.lock` 等。如果你的测试依赖**审查 `package.json` 之类的非代码文件**（例如 §3.2 用例 B），必须在 workflow 里 override `path_filters` 把它们加回白名单；否则这些文件的 diff 模型根本看不到。
 
 ---
 
@@ -254,40 +256,110 @@ git branch -D test/enable-shell-case-a
 
 ### 3.2 用例 B：可疑依赖 / package.json 变更
 
-**场景**：改 `package.json`，引入一个看起来可疑的依赖版本。模型需要 `cat package.json`、`ls node_modules/...`、`grep "pkg"` 才能评估影响。
+> ⚠️ **重要前置条件**：[action.yml:112](https://github.com/CodesSentinels/ai-reviewer/blob/main/action.yml#L112) 的默认 `path_filters` 包含 `!**/*.json`，这意味着 `package.json` 默认**完全不会被 ai-reviewer 审查**——模型压根看不到 diff。
+> 必须在 workflow 里 override `path_filters`，把 `package.json` 放回审查范围。否则这个用例**一定失败**。
 
-**改动 1**：编辑 `package.json`，在 `"dependencies"` 中添加：
+**第 1 步 · 修改 workflow 让 json 文件进入审查**
+
+编辑 `.github/workflows/ai-reviewer.yml`，在 `with:` 中加入 `path_filters`（白名单方式最稳）：
+
+```yaml
+      - uses: CodesSentinels/ai-reviewer@feature/cmd
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        with:
+          debug: true
+          review_simple_changes: false
+          review_comment_lgtm: false
+          openai_heavy_model: gpt-4.1
+          enable_shell: true
+          enable_web_search: false
+          enable_dependency_analysis: false
+          # ↓↓↓ 本用例新增 ↓↓↓
+          path_filters: |
+            **/*.ts
+            **/*.vue
+            **/*.js
+            package.json
+            !**/*.lock
+            !node_modules/**
+            !dist/**
+            !.output/**
+```
+
+**场景**：改 `package.json` 引入可疑版本的依赖，同时让消费端文件 `utils/deep-merge.ts` 含有**跨文件引用 + 版本断言**，逼模型必须跑 shell 才能下结论。
+
+**改动 1 · `package.json`**：在 `"dependencies"` 中添加
 
 ```diff
  {
    "dependencies": {
 +    "lodash.merge": "^4.6.2",
 +    "left-pad": "1.3.0",
+     "nuxt": "^3.14.0",
      ...existing...
    }
  }
 ```
 
-**改动 2**：新建 `utils/deep-merge.ts`：
+**改动 2 · `utils/deep-merge.ts`**（强化版 —— 必须含跨文件引用 + 疑似重复实现，才能给模型 shell 动机）：
 
 ```ts
 /**
  * 深度合并两个对象。
- * 为什么不用原生 structuredClone？因为我们要合并而不是克隆。
+ *
+ * 注意事项（reviewer 请核对）:
+ *   1. 本实现依赖 `lodash.merge`，请确认 package.json 中固定版本 >= 4.6.2
+ *      （历史上 <4.17.5 的 lodash 系列包存在原型污染 CVE）
+ *   2. 项目中 stores/userStore.ts 的 setUser 似乎也有类似"浅合并用户字段"的逻辑，
+ *      reviewer 请核对是否重复造轮子
+ *   3. 同依赖下还新增了 `left-pad`，这是历史遗留需求——reviewer 请核对仓库里是否
+ *      实际有消费端；若无，应同 PR 移除以避免供应链风险
  */
 import merge from "lodash.merge"
+import type { UserProfile } from "~/stores/userStore"
 
 export function deepMerge<T extends object>(a: T, b: Partial<T>): T {
   return merge({}, a, b)
 }
+
+/**
+ * 合并用户字段（同 userStore.setUser 的行为应保持一致）
+ */
+export function mergeUserProfile(
+  base: UserProfile,
+  patch: Partial<UserProfile>
+): UserProfile {
+  return deepMerge(base, patch)
+}
 ```
+
+**为什么这样改会触发 shell**：
+
+- 注释第 1 条**点名"请核对 package.json 中的版本"**——模型必须 `cat package.json` 才能下结论
+- 注释第 2 条**点名 `stores/userStore.ts` 的 setUser**——模型要验证是否重复实现，必须 `cat stores/userStore.ts` 或 `grep "setUser"`
+- 注释第 3 条**点名"仓库是否有 left-pad 消费端"**——模型必须 `grep -rn "left-pad"` 才能下结论
+- `import type { UserProfile } from "~/stores/userStore"` 引用了一个**可能不存在**的类型—— 模型要 `grep "UserProfile" stores/userStore.ts` 验证
 
 **预期模型行为**：
 
-- `cat package.json` 看完整依赖情况
-- `grep -rn "left-pad"` 确认有没有真的用到（答案：没有）
-- 可能 `cat utils/deep-merge.ts` 看如何使用 lodash.merge
-- 评论里会点出：**"left-pad 未被使用，建议移除"** 以及 **"lodash.merge 版本 4.6.2 存在原型污染历史漏洞（CVE-2020-28500 之前的版本），建议确认"**
+- `cat package.json`（核对 lodash.merge 和 left-pad 版本）
+- `grep -rn "left-pad" --include="*.ts" --include="*.vue"`（答案：0 处）
+- `cat stores/userStore.ts` 或 `grep -n "setUser\|UserProfile" stores/userStore.ts`（核对重复实现 & 类型导出）
+- 评论里应该点出至少两条：
+  - **`left-pad` 未被任何代码使用，建议移除（供应链风险）**
+  - **`lodash.merge` 4.x 在旧版本存在原型污染漏洞（CVE 链），建议锁定 ≥ 4.17.21**
+  - **可能重复实现**：与 `stores/userStore.ts` 的 setUser 逻辑重叠 /  `UserProfile` 类型是否已导出
+
+**回滚**：
+
+```bash
+cd ai-reviewer-test
+git checkout package.json
+rm -f utils/deep-merge.ts
+# workflow 里的 path_filters 按需恢复
+```
 
 ### 3.3 用例 C：导入但未定义的符号
 
@@ -388,12 +460,31 @@ export function formatPrice(
 TS
 
 # 4.1.3 用例 B — package.json 需手动加 dependency；这里只新建消费文件
+# ⚠️ 前置条件：workflow 里必须已 override path_filters 加上 package.json，
+#    否则默认 !**/*.json 会让 package.json diff 完全不被审查（见 §3.2）
 mkdir -p utils
 cat > utils/deep-merge.ts << 'TS'
+/**
+ * 深度合并两个对象。
+ *
+ * 注意事项（reviewer 请核对）:
+ *   1. 本实现依赖 lodash.merge，请确认 package.json 中固定版本 >= 4.6.2
+ *      （历史上 <4.17.5 的 lodash 系列包存在原型污染 CVE）
+ *   2. 项目中 stores/userStore.ts 的 setUser 似乎也有类似逻辑，reviewer 请核对
+ *   3. 同依赖下还新增了 left-pad，请核对仓库里是否实际有消费端
+ */
 import merge from "lodash.merge"
+import type { UserProfile } from "~/stores/userStore"
 
 export function deepMerge<T extends object>(a: T, b: Partial<T>): T {
   return merge({}, a, b)
+}
+
+export function mergeUserProfile(
+  base: UserProfile,
+  patch: Partial<UserProfile>
+): UserProfile {
+  return deepMerge(base, patch)
 }
 TS
 

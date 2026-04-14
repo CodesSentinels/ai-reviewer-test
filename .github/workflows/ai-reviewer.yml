@@ -38,3 +38,12 @@ jobs:
           enable_shell: true
           enable_web_search: false
           enable_dependency_analysis: false
+          path_filters: |
+            **/*.ts
+            **/*.vue
+            **/*.js
+            package.json
+            !**/*.lock
+            !node_modules/**
+            !dist/**
+            !.output/**
