@@ -26,7 +26,7 @@ jobs:
       github.event_name != 'issue_comment' ||
       github.event.issue.pull_request != null
     steps:
-      - uses: CodesSentinels/ai-reviewer@feature/cmd
+      - uses: CodesSentinels/ai-reviewer@feature/shell
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -34,4 +34,4 @@ jobs:
           debug: true
           review_simple_changes: false
           review_comment_lgtm: false
-          openai_heavy_model: gpt-4.1
+          openai_heavy_model: gpt-5.4-mini
