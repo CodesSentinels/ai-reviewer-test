@@ -169,7 +169,7 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         with:
           debug: true
-          review_simple_changes: false
+          review_simple_changes: true    # ← 必须为 true！否则 triage 会把简单改动过滤掉，heavyBot 根本不会被调用，shell 也就无从跑起
           review_comment_lgtm: false
           openai_heavy_model: gpt-4.1
 
@@ -182,6 +182,14 @@ jobs:
 > 💡 把 `enable_dependency_analysis` 也关掉是**关键技巧**：该功能会预先把跨文件引用贴给模型，导致模型"不需要"跑 shell 就能写出评论。关掉后，模型只能靠 `enable_shell` 拿到跨文件上下文，shell 触发率会显著提高。
 >
 > ⚠️ **默认 path_filters 陷阱**：[action.yml:112](https://github.com/CodesSentinels/ai-reviewer/blob/main/action.yml#L112) 的默认 `path_filters` 排除 `!**/*.json`、`!**/*.yaml`、`!**/*.yml`、`!**/*.lock` 等。如果你的测试依赖**审查 `package.json` 之类的非代码文件**（例如 §3.2 用例 B），必须在 workflow 里 override `path_filters` 把它们加回白名单；否则这些文件的 diff 模型根本看不到。
+>
+> ⚠️ **三道"过滤门"让 shell 永远没机会跑 / 永远看不到**（非常重要）：
+>
+> 1. **triage 门**（`src/review.ts:429-440, 584-591`）：`review_simple_changes: false` 时，lightBot 会先给每个文件打 `NEEDS_REVIEW` / `APPROVED` 标签——**被打成 `APPROVED` 的文件根本不会调用 heavyBot**，自然没有 shell。要稳定测试 shell 功能，**务必设置 `review_simple_changes: true`** 关闭 triage 分流，让所有文件都进 heavyBot。
+> 2. **path_filters 门**：见上一条。
+> 3. **Analysis chain 附着门**（`src/review.ts:774-782`）：chain **只挂在每个文件的第一条 review comment 上**。如果 heavyBot 跑了 shell，但最终对该文件产出了 0 条 review comment（判定无需点评），chain 虽然生成了却**无处附着**，PR 评论区会完全看不到。→ 解决方式：让改动**必然会被挑出至少一条问题**（breaking change、dead code、悬空 import 这类），确保有 comment 可挂。
+>
+> 所以本文档所有用例都假设 workflow 里设置了 `review_simple_changes: true`。
 
 ---
 
@@ -811,6 +819,8 @@ Length of output: 4096
 | 症状 | 可能原因 | 验证方法 |
 |---|---|---|
 | `enable_shell: true` 但没有 shell_call | 模型自身选择不用 shell（简单 diff） | 用更复杂的用例（§3.1 或 3.3）；或检查 PR diff 是不是太 trivial 被 `review_simple_changes` filter 了 |
+| Actions log 里完全没有 `[analysis_chain] <file>: received ... steps` | 文件被 triage 打成 `APPROVED`，heavyBot 根本没被调用 | 把 `review_simple_changes` 改为 `true`；或让文件改动更显眼（breaking change） |
+| `received N>0 steps` 但 PR 评论里没有 🧩 Analysis chain | heavyBot 跑了 shell 但对该文件产出 0 条 comment → chain 无处附着 | 让改动"必会被挑出至少一条问题"（breaking、dead import、未定义符号等） |
 | Analysis chain 空 | `analysisSteps.length === 0` | 搜索 log `[analysis_chain] <file>: received 0 analysis steps`；检查模型返回的 output 里是否实际含 `shell_call` |
 | 命令都超时 | Runner 网络/磁盘慢 | 查单条 command 的 stderr，通常含 `SIGTERM` 和 `signal` |
 | 模型请求了 shell，但 action 没执行 | `pendingShellCalls` 未进入循环 | 检查 `MAX_LOCAL_SHELL_TURNS` 是否已耗尽；搜 `Reached local shell turn limit` |
