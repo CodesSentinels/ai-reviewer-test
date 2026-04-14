@@ -189,52 +189,68 @@ jobs:
 
 ### 3.1 用例 A：跨文件引用驱动（强触发）✅ 推荐首选
 
-**场景**：修改一个被多处引用的函数签名，但只改实现，不改调用方。模型为了判断"改动是否破坏调用方"，必须 `grep` 整个仓库。
+**场景**：修改一个**被多处真实引用**的函数的签名，让它变成 breaking change，**但不改任何调用方**。模型要判断"这改动安不安全"必须 `grep`/`cat` 到每一个调用点。
 
-**改动**：在 `utils/validators.ts` **末尾追加** 下列代码：
+> ⚠️ **设计要点**：这个用例的核心不是"新增一个参数"，而是"**让现有调用方在新签名下一定报错**"。新增默认值的可选参数不会 break caller，模型可以不看 caller 就说 OK——那样就无法证明 `enable_shell` 被用到了。
+
+**目标函数**：[utils/formatPrice.ts](../ai-reviewer-test/utils/formatPrice.ts) 的 `formatPrice`
+
+**当前仓库里的真实调用方**（共 5 处，全部只传 1 个参数依赖 `currency` 的默认值 `"CNY"`）：
+
+```
+components/ProductCard.vue:25      formatPrice(props.price)
+components/CartSummary.vue:17      formatPrice(total.value)
+components/CartSummary.vue:24      formatPrice(item.price)
+pages/products/[id].vue:20         formatPrice(product.value.price)
+```
+
+**改动**：把 `utils/formatPrice.ts` 改成下列内容（**关键：移除 `currency` 默认值，并把参数顺序调换**）：
 
 ```ts
-// utils/validators.ts —— 追加
-
 /**
- * 校验邮箱格式
+ * 价格格式化工具
  *
- * 注意：第二个参数 `strict` 是 NEW（原本不存在）。
- * 调用方可能仍在按 (email) 单参形式调用——模型需要 grep 所有 usages 才能判断。
+ * 变更：
+ *  - currency 不再有默认值，成为必需参数
+ *  - locale 与 currency 的参数顺序互换，使业务方更直观地先指定展示区域再指定币种
  */
-export function isValidEmail(email: string, strict: boolean): boolean {
-  const basic = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-  if (!basic.test(email)) return false
-  if (!strict) return true
-  // strict 模式禁止 + 号和连续点
-  if (email.includes('+')) return false
-  if (email.includes('..')) return false
-  return true
-}
-
-/**
- * 判断字符串是否为 JSON
- *
- * 这里用了 try/catch + JSON.parse；调用方可能在热路径里高频调用，
- * 模型应该通过 grep 确认调用点与频率。
- */
-export function isJsonString(value: unknown): boolean {
-  if (typeof value !== 'string') return false
-  try {
-    JSON.parse(value)
-    return true
-  } catch {
-    return false
-  }
+export function formatPrice(
+  amount: number,
+  locale: string,
+  currency: string
+): string {
+  return new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency
+  }).format(amount)
 }
 ```
 
+**为什么这一定会触发 shell**：
+
+1. 改动**只在 `utils/formatPrice.ts` 一个文件**，diff 里完全看不到调用方
+2. 模型如果不 grep，就无法判断"这个 breaking change 会不会炸 5 个地方"
+3. `formatPrice(price)` 单参调用在新签名下既缺必需参数、又把 `amount` 当成了 `locale`——**双重破坏**
+4. 负责任的 reviewer（人或 AI）一定会去看 caller
+
 **预期模型行为**：
 
-- `grep -rn "isValidEmail" --include="*.ts" --include="*.vue"` 找调用方
-- `grep -rn "isJsonString" ...` 找调用方
-- 可能还会 `cat composables/useAuth.ts` 等相关文件
-- 评论里会点出：**"strict 参数是新增的必需参数，但旧调用方没传——会导致 TypeScript 编译错误 / 运行时行为变化"**
+- `grep -rn "formatPrice" --include="*.ts" --include="*.vue"` → 找到 5 个调用点
+- `cat components/ProductCard.vue`、`cat components/CartSummary.vue`、`cat pages/products/\[id\].vue` 之一或全部
+- 评论里会明确点出：
+  - **`formatPrice` 是 breaking change**：移除了 `currency` 的默认值，且参数顺序变了
+  - **`ProductCard.vue:25` / `CartSummary.vue:17,24` / `pages/products/[id].vue:20` 共 5 处** 仍在用旧签名调用，会报 TypeScript 错误
+  - 建议：要么保留默认值 & 不调换顺序；要么同 PR 一起修所有调用方
+
+**回滚**：
+
+```bash
+cd ai-reviewer-test
+git checkout utils/formatPrice.ts   # 恢复单文件
+# 或整个分支：
+git checkout main
+git branch -D test/enable-shell-case-a
+```
 
 ### 3.2 用例 B：可疑依赖 / package.json 变更
 
@@ -350,26 +366,24 @@ git checkout -b test/enable-shell-e2e
 #   enable_dependency_analysis: false
 $EDITOR .github/workflows/ai-reviewer.yml
 
-# 4.1.2 用例 A
-cat >> utils/validators.ts << 'TS'
-
-export function isValidEmail(email: string, strict: boolean): boolean {
-  const basic = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-  if (!basic.test(email)) return false
-  if (!strict) return true
-  if (email.includes('+')) return false
-  if (email.includes('..')) return false
-  return true
-}
-
-export function isJsonString(value: unknown): boolean {
-  if (typeof value !== 'string') return false
-  try {
-    JSON.parse(value)
-    return true
-  } catch {
-    return false
-  }
+# 4.1.2 用例 A — formatPrice 做 breaking change（不改调用方）
+cat > utils/formatPrice.ts << 'TS'
+/**
+ * 价格格式化工具
+ *
+ * 变更：
+ *  - currency 不再有默认值，成为必需参数
+ *  - locale 与 currency 的参数顺序互换
+ */
+export function formatPrice(
+  amount: number,
+  locale: string,
+  currency: string
+): string {
+  return new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency
+  }).format(amount)
 }
 TS
 
@@ -500,10 +514,12 @@ Length of output: 5678
 模型通常会发出这些风格的命令：
 
 ```sh
-cat utils/validators.ts
-grep -rn "isValidEmail" --include="*.ts" --include="*.vue"
+grep -rn "formatPrice" --include="*.ts" --include="*.vue"
+cat components/ProductCard.vue
+cat components/CartSummary.vue
+cat pages/products/\[id\].vue
+grep -rn "getFeatureFlags" --include="*.ts"
 ls utils/
-head -n 100 stores/userStore.ts
 cat package.json | jq '.dependencies'
 ```
 
@@ -603,7 +619,7 @@ Length of output: 4096
 - [ ] 至少有一个 `[local_shell] executing command ... :` 日志行
 - [ ] 至少有一条 review comment 末尾含 `<details><summary>🧩 Analysis chain</summary>`
 - [ ] Analysis chain 中的 `Ran shell command` 块和 Actions 日志里的命令一一对应
-- [ ] 用例 A 的评论里有"strict 参数是新增的"或等价提示
+- [ ] 用例 A 的评论里有"`formatPrice` 是 breaking change / 5 个调用点会失败"或等价提示
 - [ ] 用例 C 的评论里指出 `getFeatureFlags` 不存在
 - [ ] 单次 chat 未出现 `Reached local shell turn limit` 警告（正常 PR 下应 ≤ 3 轮）
 
