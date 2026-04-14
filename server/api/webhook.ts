@@ -6,6 +6,10 @@
 
 import Stripe from "stripe"
 
+// server/api/<some-handler>.ts
+import { normalizeSlug } from "~/utils/string-helpers"
+// ... handler body 里故意不使用 ↑
+
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "sk_test_xxx", {
   // apiVersion: "2024-12-18.acacia",
   apiVersion: "2024-12-18"

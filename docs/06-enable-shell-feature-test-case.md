@@ -394,30 +394,94 @@ export function useFeatureFlag(flag: string) {
 
 ### 3.4 用例 D：目录结构相关的改动
 
-**场景**：新建一个文件时，模型需要知道周围还有什么文件才能建议合理位置。
+**场景**：新建文件时，让它**同时依赖**：（a）其它 `utils/*` 是否已有等价实现、（b）被一个**已存在的 server 路由**消费。模型必须 `ls utils/` + `grep` + `cat` 才能完成断言。
 
-**改动**：新建 `utils/string-helpers.ts`：
+> 💡 用例 D 改造要点：不要写独立文件！纯独立的小工具模型直接一眼看完就下结论，不会跑 shell。必须让注释里**明文要求核对仓库中的其它文件/目录**，并且 `import`/`re-export` 一个**引用链可疑**的符号。
+
+**改动 1** · 新建 `utils/string-helpers.ts`：
 
 ```ts
 /**
- * 把蛇形下划线转换为小驼峰。
+ * 字符串工具集
  *
- * 注意：项目里可能已经有同名或同义工具，引入前请检查。
+ * reviewer 请核对以下事项（否则不要 LGTM）:
+ *   1. utils/ 目录下是否已存在其它 *-helper.ts 或等价的 case 转换实现
+ *      （特别留意 date-helper.ts / crypto-helper.ts 的命名风格——本文件名为
+ *      string-helpers.ts 复数形式是否与既有风格冲突）
+ *   2. 本文件 re-export 了 utils/validators.ts 的 isStrongPassword，以让
+ *      外部一次性 import 全部字符串处理函数；请核对 validators.ts 是否**真的**
+ *      导出了这个符号（它是迭代一追加的，可能已被重命名或删除）
+ *   3. server/api 下的某个 handler 依赖 `normalizeSlug`，请 grep 确认调用点
+ */
+
+// 再导出 — 如果 validators.ts 没有 isStrongPassword 会编译失败
+export { isStrongPassword } from "~/utils/validators"
+
+/**
+ * 下划线转小驼峰
  */
 export function snakeToCamel(s: string): string {
   return s.replace(/_([a-z])/g, (_, c) => c.toUpperCase())
 }
 
+/**
+ * 小驼峰转下划线
+ */
 export function camelToSnake(s: string): string {
   return s.replace(/([A-Z])/g, "_$1").toLowerCase()
 }
+
+/**
+ * 把任意字符串规范化为 URL-safe slug
+ * 依赖: 期望 server/api/* 的路由 handler 使用此函数保持 slug 一致性
+ */
+export function normalizeSlug(raw: string): string {
+  return raw
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+}
 ```
+
+**改动 2** · （可选但推荐）在 `server/api/` 下任选一个既有 handler，加一处 **import 但不调用** `normalizeSlug` 的语句，人为制造"悬空 import"来进一步吸引模型 grep：
+
+```ts
+// server/api/<some-handler>.ts
+import { normalizeSlug } from "~/utils/string-helpers"
+
+// ... handler body 里故意不使用 ↑
+```
+
+**为什么这样改会触发 shell**：
+
+| 注释条目 | 模型必须跑的 shell |
+|---|---|
+| "utils/ 目录下是否已存在其它 *-helper.ts" | `ls utils/` |
+| "留意 date-helper.ts / crypto-helper.ts 的命名风格" | `ls utils/ \| grep helper` |
+| "validators.ts 是否真的导出了 isStrongPassword" | `grep -n "isStrongPassword" utils/validators.ts` 或 `cat utils/validators.ts` |
+| "server/api 下某个 handler 依赖 normalizeSlug" | `grep -rn "normalizeSlug" server/api/` |
+| 改动 2 的"悬空 import" | `grep -rn "normalizeSlug"` 找调用点 |
+
+4 条硬约束，模型**几乎不可能**不跑 shell 就写出"负责任"的评论。
 
 **预期模型行为**：
 
-- `ls utils/`
-- `grep -rn "camelCase\|snakeCase\|snake_case" --include="*.ts"` 找是否有既有实现
-- 评论里会建议：**"检查项目是否已有等效工具；若无，此文件可独立存在"**，或**"是否应命名为 string-case.ts 与已有 date-helper.ts/crypto-helper.ts 风格一致"**
+- `ls utils/` → 看到 `crypto-helper.ts`、`date-helper.ts`、`api-client.ts` 等
+- `grep -n "isStrongPassword" utils/validators.ts` → 验证 re-export 是否有效
+- `grep -rn "normalizeSlug" --include="*.ts"` → 找调用点（若只有悬空 import，没有实际调用）
+- 评论里应点出至少两条：
+  - **命名风格不一致**：已有 `date-helper.ts`（单数）vs 本文件 `string-helpers.ts`（复数）
+  - **re-export 依赖 validators.ts 的 `isStrongPassword`**：需确认它存在；若 validators.ts 没导出会编译错
+  - **`normalizeSlug` 被 import 但未调用**（dead import）或**仅在 X 处被调用**
+
+**回滚**：
+
+```bash
+cd ai-reviewer-test
+rm -f utils/string-helpers.ts
+git checkout server/api/<你改过的 handler>   # 如果做了改动 2
+```
 
 ---
 
@@ -504,14 +568,33 @@ export function useFeatureFlag(flag: string) {
 }
 TS
 
-# 4.1.5 用例 D
+# 4.1.5 用例 D — 强化版：带 re-export + 跨 server/api 引用，逼模型 ls/grep
 cat > utils/string-helpers.ts << 'TS'
+/**
+ * 字符串工具集
+ *
+ * reviewer 请核对以下事项（否则不要 LGTM）:
+ *   1. utils/ 目录下是否已存在其它 *-helper.ts 或等价的 case 转换实现
+ *      （留意 date-helper.ts / crypto-helper.ts 的命名——本文件为复数形式）
+ *   2. 本文件 re-export validators.ts 的 isStrongPassword，请核对是否真存在
+ *   3. server/api 下的某个 handler 依赖 normalizeSlug，请 grep 确认调用点
+ */
+export { isStrongPassword } from "~/utils/validators"
+
 export function snakeToCamel(s: string): string {
   return s.replace(/_([a-z])/g, (_, c) => c.toUpperCase())
 }
 
 export function camelToSnake(s: string): string {
   return s.replace(/([A-Z])/g, "_$1").toLowerCase()
+}
+
+export function normalizeSlug(raw: string): string {
+  return raw
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
 }
 TS
 
