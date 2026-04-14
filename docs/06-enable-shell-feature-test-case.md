@@ -405,52 +405,69 @@ export function useFeatureFlag(flag: string) {
 **场景**：新建文件时，让它**同时依赖**：（a）其它 `utils/*` 是否已有等价实现、（b）被一个**已存在的 server 路由**消费。模型必须 `ls utils/` + `grep` + `cat` 才能完成断言。
 
 > 💡 用例 D 改造要点：不要写独立文件！纯独立的小工具模型直接一眼看完就下结论，不会跑 shell。必须让注释里**明文要求核对仓库中的其它文件/目录**，并且 `import`/`re-export` 一个**引用链可疑**的符号。
+>
+> ⚠️ **文件里必须含至少一个 diff-visible 的明显 bug**：ai-reviewer 只在 `reviews.length > 0` 时才把 Analysis chain 挂到某条 comment 上（见 `src/review.ts:758-795` 的"门 3"）。如果模型跑了 shell 但最终判定"没啥好评的"，chain 虽然生成了（Actions log 里 `length=614, empty=false`）却**永远不会出现在 PR 评论区**。所以文件里**必须埋至少一个肉眼可见的 bug**，强迫模型产出 review comment。
 
-**改动 1** · 新建 `utils/string-helpers.ts`：
+**改动 1** · 新建 `utils/string-helpers.ts`（**刻意埋了 4 个 diff-visible bug**，见行内 `BUG #` 注释）：
 
 ```ts
 /**
  * 字符串工具集
  *
- * reviewer 请核对以下事项（否则不要 LGTM）:
- *   1. utils/ 目录下是否已存在其它 *-helper.ts 或等价的 case 转换实现
- *      （特别留意 date-helper.ts / crypto-helper.ts 的命名风格——本文件名为
- *      string-helpers.ts 复数形式是否与既有风格冲突）
- *   2. 本文件 re-export 了 utils/validators.ts 的 isStrongPassword，以让
- *      外部一次性 import 全部字符串处理函数；请核对 validators.ts 是否**真的**
- *      导出了这个符号（它是迭代一追加的，可能已被重命名或删除）
- *   3. server/api 下的某个 handler 依赖 `normalizeSlug`，请 grep 确认调用点
+ * reviewer 请核对以下事项:
+ *   1. 本文件 re-export 了 utils/validators.ts 的 isStrongPassword
+ *      请核对是否真的存在（可能已被重命名或删除）
+ *   2. utils/ 目录下命名风格参考：date-helper.ts / crypto-helper.ts
+ *      本文件取名 string-helpers.ts（复数）是否合理？
+ *   3. server/api 下是否有 handler 依赖 normalizeSlug
  */
 
-// 再导出 — 如果 validators.ts 没有 isStrongPassword 会编译失败
+// re-export — 若 validators.ts 没有 isStrongPassword 则编译失败
 export { isStrongPassword } from "~/utils/validators"
 
 /**
  * 下划线转小驼峰
  */
 export function snakeToCamel(s: string): string {
-  return s.replace(/_([a-z])/g, (_, c) => c.toUpperCase())
+  // BUG #1: 正则缺少 g 标志，只替换首个 _x，后续不处理
+  return s.replace(/_([a-z])/, (_, c) => c.toUpperCase())
 }
 
 /**
  * 小驼峰转下划线
  */
 export function camelToSnake(s: string): string {
+  // BUG #2: "FooBar" -> "_foo_bar"（多了前导下划线，未处理开头大写）
   return s.replace(/([A-Z])/g, "_$1").toLowerCase()
 }
 
 /**
- * 把任意字符串规范化为 URL-safe slug
- * 依赖: 期望 server/api/* 的路由 handler 使用此函数保持 slug 一致性
+ * 规范化为 URL-safe slug
+ * 依赖: server/api/* 的路由 handler 应使用此函数保持 slug 一致性
  */
 export function normalizeSlug(raw: string): string {
+  // BUG #3: raw 可能为 null/undefined 未做守卫，会抛 TypeError
   return raw
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
 }
+
+/**
+ * 截断字符串到 N 字符并追加省略号
+ * 例：truncate("hello", 3) → "he…"
+ */
+export function truncate(input: string, max: number): string {
+  // BUG #4: max <= 0 时 substring(0, -1) 行为反常；且未判断 input.length <= max 的短路
+  return input.substring(0, max - 1) + "…"
+}
 ```
+
+**为什么 4 个 bug 是关键**：
+- 这些 bug **光读 diff 就能看见**，模型必然点评至少 1~2 处
+- 只要产出 ≥ 1 条 review comment，Analysis chain（shell 输出）才会被挂上去
+- 否则 shell 跑了也等于白跑，评论区完全看不到
 
 **改动 2** · （可选但推荐）在 `server/api/` 下任选一个既有 handler，加一处 **import 但不调用** `normalizeSlug` 的语句，人为制造"悬空 import"来进一步吸引模型 grep：
 
@@ -576,33 +593,41 @@ export function useFeatureFlag(flag: string) {
 }
 TS
 
-# 4.1.5 用例 D — 强化版：带 re-export + 跨 server/api 引用，逼模型 ls/grep
+# 4.1.5 用例 D — 强化版：re-export + 跨 server/api 引用 + 4 个 diff-visible bug
+#   （bug 是关键：确保模型产出 review comment，chain 才有地方挂）
 cat > utils/string-helpers.ts << 'TS'
 /**
  * 字符串工具集
  *
- * reviewer 请核对以下事项（否则不要 LGTM）:
- *   1. utils/ 目录下是否已存在其它 *-helper.ts 或等价的 case 转换实现
- *      （留意 date-helper.ts / crypto-helper.ts 的命名——本文件为复数形式）
- *   2. 本文件 re-export validators.ts 的 isStrongPassword，请核对是否真存在
- *   3. server/api 下的某个 handler 依赖 normalizeSlug，请 grep 确认调用点
+ * reviewer 请核对:
+ *   1. re-export utils/validators.ts 的 isStrongPassword，请 grep 核对是否存在
+ *   2. utils/ 命名风格：date-helper.ts / crypto-helper.ts（单数 vs 复数）
+ *   3. server/api 下是否有 handler 依赖 normalizeSlug
  */
 export { isStrongPassword } from "~/utils/validators"
 
 export function snakeToCamel(s: string): string {
-  return s.replace(/_([a-z])/g, (_, c) => c.toUpperCase())
+  // BUG #1: 缺 g 标志，只替换首个
+  return s.replace(/_([a-z])/, (_, c) => c.toUpperCase())
 }
 
 export function camelToSnake(s: string): string {
+  // BUG #2: "FooBar" -> "_foo_bar"
   return s.replace(/([A-Z])/g, "_$1").toLowerCase()
 }
 
 export function normalizeSlug(raw: string): string {
+  // BUG #3: raw 为 null/undefined 会 TypeError
   return raw
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
+}
+
+export function truncate(input: string, max: number): string {
+  // BUG #4: max <= 0 未守卫；input.length <= max 时无短路
+  return input.substring(0, max - 1) + "…"
 }
 TS
 
