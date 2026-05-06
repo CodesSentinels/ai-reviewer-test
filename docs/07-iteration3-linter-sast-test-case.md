@@ -252,7 +252,7 @@ _N findings on changed lines._
 
 ### 2.7 场景 G — 工具不可用时的容错
 
-**触发方式**: 在 workflow 中**故意不安装** `@biomejs/biome`（删除 `npm install` 步骤或改成只安装 eslint）
+**触发方式 G1**（二进制缺失）: 在 workflow 中**故意不安装** `@biomejs/biome`（删除 `npm install` 步骤或改成只安装 eslint）
 
 **预期**:
 
@@ -261,7 +261,17 @@ _N findings on changed lines._
 - 整个 review 不被打断
 - 日志中能看到 `lint/biome: not available — ...` 的警告
 
-**通过条件**: 单工具不可用不影响其他工具与整体审查流程。
+**触发方式 G2**（ESLint 项目无配置，改进 A）: 在测试分支根目录**删除 `eslint.config.js`** 与所有 `.eslintrc.*` 文件，保留 ESLint 二进制和 Biome 配置
+
+**预期**:
+
+- ESLint 二进制 `npx eslint --version` 仍成功 → 二进制可用
+- 但 `EslintAdapter.detect()` 第二步检查项目配置时未找到任何配置文件
+- 统计表中 ESLint 行显示 `_unavailable_`，`reason` 列写出 `no ESLint config found in repo (looked for eslint.config.{js,mjs,cjs,ts,mts,cts}, .eslintrc.*, package.json#eslintConfig)`
+- Biome 仍正常工作（零配置可用）
+- 日志中能看到 `lint/eslint: not available — no ESLint config found in repo …` 的警告
+
+**通过条件**: 任一种"工具不可用"都不影响其他工具与整体审查流程，且原因在统计表中清晰可见。
 
 ---
 
@@ -387,14 +397,15 @@ npm test -- __tests__/lint-prompt-injection.test.ts
 
 ## 5. 单元测试入口
 
-仓库内还附带三组单元测试，可在 ai-reviewer 本地直接跑（不依赖 GitHub）：
+仓库内还附带四组单元测试，可在 ai-reviewer 本地直接跑（不依赖 GitHub）：
 
 ```bash
 cd ../ai-reviewer
 npm test -- \
   __tests__/lint-diff-filter.test.ts \
   __tests__/lint-orchestrator.test.ts \
-  __tests__/lint-prompt-injection.test.ts
+  __tests__/lint-prompt-injection.test.ts \
+  __tests__/lint-eslint-config-detection.test.ts
 ```
 
 预期：
@@ -402,8 +413,9 @@ npm test -- \
 - `lint-diff-filter.test.ts`：8 个用例全部通过（unified diff 行号提取、变更窗口过滤、跨工具去重）
 - `lint-orchestrator.test.ts`：4 个用例全部通过（启用/禁用、不可用工具、抛异常容错、disabled 短路）
 - `lint-prompt-injection.test.ts`：4 个用例全部通过（杠杆 A：lintContext 空/非空两条路径、空白字符容忍、token 节省下界）
+- `lint-eslint-config-detection.test.ts`：7 个用例全部通过（改进 A：Flat Config / Legacy / package.json#eslintConfig / 损坏 package.json / 全部缺失）
 
-合并后 ai-reviewer 全部测试 198 个均通过。
+合并后 ai-reviewer 全部测试 205 个均通过。
 
 ---
 
@@ -422,3 +434,4 @@ npm test -- \
 | ✅ 性能                                 | 各工具 Duration 列均 < 60s，统计表合计 < 3min           |
 | ✅ 错误容忍                             | 场景 G 通过                                             |
 | ✅ 杠杆 A：无 finding 文件零 token 浪费 | 场景 K 通过；`lint-prompt-injection.test.ts` 4 用例通过 |
+| ✅ 改进 A：ESLint 项目无配置时优雅降级 | 场景 G2 通过；`lint-eslint-config-detection.test.ts` 7 用例通过 |
