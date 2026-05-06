@@ -7,7 +7,7 @@
 #   bash test_cases/iteration3-linter-sast/code-changes/apply-changes.sh
 #
 # 做什么:
-#   1. 创建测试分支 test/iter3-linter-sast
+#   1. 创建测试分支 feature/lint
 #   2. 拷贝 .codesentinel.yaml / eslint.config.js / biome.json 到仓库根
 #   3. 在 utils/ 下新建 lint-test-cart.ts（含多种刻意问题）
 #   4. 在 devDependencies 中安装 eslint + @biomejs/biome（如果尚未安装）
@@ -27,7 +27,7 @@ cd "$REPO_ROOT"
 echo "工作目录: $(pwd)"
 
 # 1. 创建分支
-BRANCH="test/iter3-linter-sast"
+BRANCH="feature/lint"
 echo "==> 创建/切换分支 ${BRANCH}"
 git checkout -b "$BRANCH" 2>/dev/null || git checkout "$BRANCH"
 

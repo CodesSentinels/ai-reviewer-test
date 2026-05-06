@@ -59,7 +59,7 @@ jobs:
     steps:
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
       # 让 npx 能跑到 eslint / biome
       - uses: actions/checkout@v4
       - run: npm install --no-audit --no-fund
@@ -88,7 +88,7 @@ bash test_cases/iteration3-linter-sast/code-changes/apply-changes.sh
 
 脚本会：
 
-1. 创建 `test/iter3-linter-sast` 分支
+1. 创建 `feature/lint` 分支
 2. 在仓库根写入：
    - `.codesentinel.yaml`（开启 eslint + biome，关闭 prettier）
    - `eslint.config.js`（最小 Flat Config）
@@ -108,17 +108,17 @@ bash test_cases/iteration3-linter-sast/code-changes/apply-changes.sh
 **目标代码**: `utils/lint-test-cart.ts::calculateTotal`
 
 ```ts
-items.map(item => {
-  total += item.quantity   // 缺 return + 错把 quantity 当价格
+items.map((item) => {
+  total += item.quantity // 缺 return + 错把 quantity 当价格
 })
 ```
 
 **预期工具发现**:
 
-| 工具 | 规则 | 严重级别 |
-|:-----|:-----|:---------|
-| ESLint | `array-callback-return` | error |
-| Biome | `lint/suspicious/useIterableCallbackReturn` | error |
+| 工具   | 规则                                        | 严重级别 |
+| :----- | :------------------------------------------ | :------- |
+| ESLint | `array-callback-return`                     | error    |
+| Biome  | `lint/suspicious/useIterableCallbackReturn` | error    |
 
 **预期 AI 行为**:
 
@@ -136,18 +136,18 @@ items.map(item => {
 **目标代码**: `utils/lint-test-cart.ts::isValidItemId`
 
 ```ts
-const tempData = 'reserved-for-future-use'
+const tempData = "reserved-for-future-use"
 if (id == null) return false
 ```
 
 **预期工具发现**:
 
-| 工具 | 规则 | 严重级别 |
-|:-----|:-----|:---------|
-| ESLint | `no-unused-vars` | error（`tempData` 未使用） |
-| ESLint | `eqeqeq` | error（应使用 `===`） |
-| Biome | `lint/correctness/noUnusedVariables` | error |
-| Biome | `lint/suspicious/noDoubleEquals` | error |
+| 工具   | 规则                                 | 严重级别                   |
+| :----- | :----------------------------------- | :------------------------- |
+| ESLint | `no-unused-vars`                     | error（`tempData` 未使用） |
+| ESLint | `eqeqeq`                             | error（应使用 `===`）      |
+| Biome  | `lint/correctness/noUnusedVariables` | error                      |
+| Biome  | `lint/suspicious/noDoubleEquals`     | error                      |
 
 **预期 AI 行为**:
 
@@ -173,9 +173,9 @@ cartItems.value.push(item)
 
 **预期工具发现**:
 
-| 工具 | 规则 | 严重级别 |
-|:-----|:-----|:---------|
-| ESLint | `no-console` | warning |
+| 工具   | 规则         | 严重级别 |
+| :----- | :----------- | :------- |
+| ESLint | `no-console` | warning  |
 
 **预期 AI 行为**:
 
@@ -223,10 +223,10 @@ params.map((value, key) => { ... })
 
 _N findings on changed lines._
 
-| Tool | Errors | Warnings | Files Scanned | Duration |
-|:-----|:------:|:--------:|:-------------:|:---------|
-| ESLint 9.x.x  | ≥3 | ≥1 | ≥1 | <60000ms |
-| Biome 2.x.x   | ≥3 | 0  | ≥1 | <60000ms |
+| Tool         | Errors | Warnings | Files Scanned | Duration |
+| :----------- | :----: | :------: | :-----------: | :------- |
+| ESLint 9.x.x |   ≥3   |    ≥1    |      ≥1       | <60000ms |
+| Biome 2.x.x  |   ≥3   |    0     |      ≥1       | <60000ms |
 
 </details>
 ```
@@ -330,10 +330,10 @@ export function clamp(n: number, lo: number, hi: number): number {
 
 **预期**:
 
-| 文件 | 是否注入 lint 段头 | 是否注入 MANDATORY 指令 | 工具发现条数 |
-|:-----|:-----------------|:----------------------|:-----------|
-| `lint-test-cart.ts` | ✅ 注入 | ✅ 注入 | ≥ 5 |
-| `no-issue-utils.ts` | ❌ 不注入 | ❌ 不注入 | 0 |
+| 文件                | 是否注入 lint 段头 | 是否注入 MANDATORY 指令 | 工具发现条数 |
+| :------------------ | :----------------- | :---------------------- | :----------- |
+| `lint-test-cart.ts` | ✅ 注入            | ✅ 注入                 | ≥ 5          |
+| `no-issue-utils.ts` | ❌ 不注入          | ❌ 不注入               | 0            |
 
 观察 GitHub Action 的 debug 日志：
 
@@ -363,25 +363,25 @@ npm test -- __tests__/lint-prompt-injection.test.ts
 
 ## 3. 测试执行顺序建议
 
-| 步骤 | 场景 | 备注 |
-|:-----|:-----|:-----|
-| 1 | A、B、C、D、E、F、K | 一次主 PR 同时覆盖；最常用（K 需在该 PR 内追加干净文件） |
-| 2 | G | 临时改 workflow 跑空 ESLint 时验证容错 |
-| 3 | H | 改输入参数验证总开关 |
-| 4 | I | 在已有 PR 上追加无关 commit 验证变更行过滤 |
-| 5 | J | 删除 `.codesentinel.yaml` 验证默认值回退 |
+| 步骤 | 场景                | 备注                                                     |
+| :--- | :------------------ | :------------------------------------------------------- |
+| 1    | A、B、C、D、E、F、K | 一次主 PR 同时覆盖；最常用（K 需在该 PR 内追加干净文件） |
+| 2    | G                   | 临时改 workflow 跑空 ESLint 时验证容错                   |
+| 3    | H                   | 改输入参数验证总开关                                     |
+| 4    | I                   | 在已有 PR 上追加无关 commit 验证变更行过滤               |
+| 5    | J                   | 删除 `.codesentinel.yaml` 验证默认值回退                 |
 
 ---
 
 ## 4. 失败排查
 
-| 现象 | 可能原因 | 排查 |
-|:-----|:---------|:-----|
-| 没有任何 lint 评论 | `enable_lint_tools=false` 或 workflow 没装工具 | 查日志 `Phase 0b` 行 |
-| 工具统计表全部 _unavailable_ | `npx --no-install` 找不到工具 | 确认 workflow 跑过 `npm install` |
-| 评论尾部 "🧰 Tools" 卡片缺失 | 工具发现不在评论行号范围内 | 查日志 `injected lint context for ...` |
-| Biome JSON 解析失败 | Biome 版本输出格式变化 | 检查日志 `lint: failed to parse JSON` |
-| ESLint 报"No files matching" | `eslint.config.js` 没生效 | 确认 Flat Config 文件名正确，`type: "module"` 已设 |
+| 现象                         | 可能原因                                       | 排查                                               |
+| :--------------------------- | :--------------------------------------------- | :------------------------------------------------- |
+| 没有任何 lint 评论           | `enable_lint_tools=false` 或 workflow 没装工具 | 查日志 `Phase 0b` 行                               |
+| 工具统计表全部 _unavailable_ | `npx --no-install` 找不到工具                  | 确认 workflow 跑过 `npm install`                   |
+| 评论尾部 "🧰 Tools" 卡片缺失 | 工具发现不在评论行号范围内                     | 查日志 `injected lint context for ...`             |
+| Biome JSON 解析失败          | Biome 版本输出格式变化                         | 检查日志 `lint: failed to parse JSON`              |
+| ESLint 报"No files matching" | `eslint.config.js` 没生效                      | 确认 Flat Config 文件名正确，`type: "module"` 已设 |
 
 ---
 
@@ -409,16 +409,16 @@ npm test -- \
 
 ## 6. 验收清单
 
-| 验收项 | 通过标准 |
-|:-------|:---------|
-| ✅ 框架可扩展 | 新增工具仅需实现 ToolAdapter |
-| ✅ ESLint 集成 | 场景 A/B/C 中 ESLint 发现正确反映 |
-| ✅ Biome 集成 | 场景 A/B 中 Biome 发现正确反映 |
-| ✅ 变更行过滤 | 场景 I 通过 |
-| ✅ 结果注入 LLM | 场景 A/B/C 中 AI 评论命名工具并解释 |
-| ✅ AI 交叉验证 | 场景 A/C 中 AI 同时覆盖工具发现 + 工具盲区 |
-| ✅ 配置化 | 场景 F/J 通过 |
-| ✅ 总开关 | 场景 H 通过 |
-| ✅ 性能 | 各工具 Duration 列均 < 60s，统计表合计 < 3min |
-| ✅ 错误容忍 | 场景 G 通过 |
+| 验收项                                  | 通过标准                                                |
+| :-------------------------------------- | :------------------------------------------------------ |
+| ✅ 框架可扩展                           | 新增工具仅需实现 ToolAdapter                            |
+| ✅ ESLint 集成                          | 场景 A/B/C 中 ESLint 发现正确反映                       |
+| ✅ Biome 集成                           | 场景 A/B 中 Biome 发现正确反映                          |
+| ✅ 变更行过滤                           | 场景 I 通过                                             |
+| ✅ 结果注入 LLM                         | 场景 A/B/C 中 AI 评论命名工具并解释                     |
+| ✅ AI 交叉验证                          | 场景 A/C 中 AI 同时覆盖工具发现 + 工具盲区              |
+| ✅ 配置化                               | 场景 F/J 通过                                           |
+| ✅ 总开关                               | 场景 H 通过                                             |
+| ✅ 性能                                 | 各工具 Duration 列均 < 60s，统计表合计 < 3min           |
+| ✅ 错误容忍                             | 场景 G 通过                                             |
 | ✅ 杠杆 A：无 finding 文件零 token 浪费 | 场景 K 通过；`lint-prompt-injection.test.ts` 4 用例通过 |
