@@ -47,3 +47,10 @@ jobs:
             !node_modules/**
             !dist/**
             !.output/**
+          enable_lint_tools: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      # 让 npx 能跑到 eslint / biome
+      - uses: actions/checkout@v4
+      - run: npm install --no-audit --no-fund
