@@ -60,9 +60,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-      # 让 npx 能跑到 eslint / biome
       - uses: actions/checkout@v4
+      # 1) 安装项目自身的依赖（含已写入 package.json 的 eslint / @biomejs/biome）
       - run: npm install --no-audit --no-fund
+      # 2) 兜底：即便 fixture 没把 lint 工具写进 package.json，也确保 runner 的
+      #    node_modules 里有这两个工具，避免 ai-reviewer 的 `npx --no-install` 失败。
+      #    --no-save 表示不污染 package.json；如果上一步已装好这里是 no-op。
+      - run: npm install --no-save --no-audit --no-fund eslint@^9 @biomejs/biome@^2
       - uses: CodesSentinels/ai-reviewer@feature/lint-sast
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -94,8 +98,16 @@ bash test_cases/iteration3-linter-sast/code-changes/apply-changes.sh
    - `eslint.config.js`（最小 Flat Config）
    - `biome.json`（最小 lint 配置）
 3. 在 `utils/lint-test-cart.ts` 写入故意带问题的 TS 代码
-4. 通过 `npm install --no-save` 装 `eslint@^9` 与 `@biomejs/biome@^2`
+4. 通过 **`npm install --save-dev`** 把 `eslint@^9` 与 `@biomejs/biome@^2`
+   写入 `package.json` 的 devDependencies，并把 `package.json` /
+   `package-lock.json` 一并 commit
 5. 提交、推送、创建 PR
+
+> ⚠️ **常见坑**：早期版本的脚本用 `--no-save`，工具仅留在本地 `node_modules`，
+> 不进 `package.json`。这会导致 GitHub Actions runner 上 `npm install` 装不到
+> 这两个工具，最终 PR 评论里 ESLint / Biome 都显示为
+> `_unavailable_ — eslint --version failed`。当前脚本已改用 `--save-dev`，
+> 同时 §1.1 workflow 中加了一道 `--no-save` 兜底安装作为保险。
 
 ---
 
@@ -128,6 +140,30 @@ items.map((item) => {
 - 评论尾部附带 "🧰 Tools" 卡片
 
 **通过条件**: 评论同时覆盖了 lint 发现 **和** 业务逻辑错误。
+
+#### 2.1.x 排查方向：AI 漏判逻辑错误时
+
+如果 PR 评论里**完全没有**针对 `calculateTotal` 的行级评论（既没指出 lint 问题，
+也没指出业务逻辑），按以下顺序定位：
+
+1. **看 GitHub Actions 日志中 `triage:` 那几行**
+   - `triage: NEEDS_REVIEW` → 文件进入了 review 阶段，问题在重量模型本身（继续步骤 2）
+   - `triage: APPROVED` → lightBot 把这次变更归类为"简单变更"跳过了 review，
+     这是最常见的漏判原因。临时缓解：把 workflow 的 `review_simple_changes` 改为 `true`
+     强制审查所有变更。
+
+2. **看日志里是否有 `lgtm` / `looks good to me` 字样**
+   - 重量模型可能产生了 LGTM 评论但被 `review_comment_lgtm: false` 过滤
+   - 临时把这个开关改为 `true`，重新触发 review 即可观察模型实际怎么看待这段代码
+
+3. **看 lint 工具是否 available**（统计表中 `_unavailable_` 字样）
+   - 工具失败时，prompt 中的 lint 区块整段为空（杠杆 A），MANDATORY 交叉验证指令
+     也不会拼入。模型只能靠通用审查规则发现问题，对纯业务语义错误（如本场景的
+     `quantity` 应该乘以 `price`）的命中率会下降。
+   - 修工具配置（详见 §1.1 与 §1.2 注意框）后再跑一次。
+
+4. **如果以上都正常但仍漏判**：把行级评论与你期望的对照截图发给我。这通常是
+   prompt 工程层面的问题，不是工具集成层。
 
 ---
 

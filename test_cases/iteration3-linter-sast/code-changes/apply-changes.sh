@@ -10,13 +10,17 @@
 #   1. 创建测试分支 feature/lint
 #   2. 拷贝 .codesentinel.yaml / eslint.config.js / biome.json 到仓库根
 #   3. 在 utils/ 下新建 lint-test-cart.ts（含多种刻意问题）
-#   4. 在 devDependencies 中安装 eslint + @biomejs/biome（如果尚未安装）
-#   5. 提交代码 + 推送 + 创建 PR
+#   4. 把 eslint + @biomejs/biome 写入 devDependencies（`--save-dev`，
+#      持久化到 package.json，确保 GitHub Actions runner 上 `npm install`
+#      也能装上）
+#   5. 提交代码（含更新后的 package.json / package-lock.json）+ 推送 + 创建 PR
 #
 # 注意:
 #   - 先确认 .github/workflows/ai-reviewer.yml 已经引用了支持 Linter/SAST
 #     的 ai-reviewer 分支（详见对应 docs）。
-#   - 工具命令通过 `npx --no-install` 运行，所以包必须装在 node_modules。
+#   - ai-reviewer 通过 `npx --no-install` 运行 lint 工具，所以工具必须出现
+#     在 runner 的 node_modules 里 — 这就需要它们在 package.json 中（或
+#     workflow 显式安装）。
 
 set -euo pipefail
 
@@ -41,22 +45,22 @@ cp "$SCRIPT_DIR/biome.json" biome.json
 echo "==> 写入 utils/lint-test-cart.ts"
 cp "$SCRIPT_DIR/lint-test-cart.ts" utils/lint-test-cart.ts
 
-# 4. 安装 lint 工具（仅当不存在时）
-if [ ! -d node_modules/eslint ]; then
-  echo "==> 安装 eslint"
-  npm install --no-save --silent eslint@^9 || echo "(installing eslint failed; please run manually)"
-fi
-if [ ! -d node_modules/@biomejs/biome ]; then
-  echo "==> 安装 @biomejs/biome"
-  npm install --no-save --silent @biomejs/biome@^2 || echo "(installing biome failed; please run manually)"
-fi
+# 4. 把 lint 工具写入 devDependencies（持久化到 package.json）
+#    注意：使用 --save-dev（不是 --no-save）— 这样 GitHub Actions runner 上的
+#    `npm install` 才能装上它们；ai-reviewer 通过 npx --no-install 才找得到。
+echo "==> 把 eslint + @biomejs/biome 写入 devDependencies"
+npm install --save-dev --silent eslint@^9 @biomejs/biome@^2 \
+  || echo "(installing eslint/biome failed; please run 'npm install --save-dev eslint@^9 @biomejs/biome@^2' manually)"
 
-# 5. 提交并推送
+# 5. 提交并推送（package.json / package-lock.json 一并提交以持久化依赖）
 git add \
   .codesentinel.yaml \
   eslint.config.js \
   biome.json \
-  utils/lint-test-cart.ts
+  utils/lint-test-cart.ts \
+  package.json
+# package-lock.json 仅在存在时加入（兼容 yarn/pnpm 项目）
+[ -f package-lock.json ] && git add package-lock.json || true
 git commit -m "test(iter3): add linter/SAST integration scenarios
 
 - introduce utils/lint-test-cart.ts with intentional ESLint/Biome violations
