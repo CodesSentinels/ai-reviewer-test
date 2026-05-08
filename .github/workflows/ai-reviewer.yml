@@ -26,6 +26,12 @@ jobs:
       github.event_name != 'issue_comment' ||
       github.event.issue.pull_request != null
     steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - uses: actions/checkout@v4
+      - run: npm install --legacy-peer-deps --no-audit --no-fund
+      - run: npm install --no-save --legacy-peer-deps --no-audit --no-fund eslint@^9 @biomejs/biome@^2
       - uses: CodesSentinels/ai-reviewer@feature/lint
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -48,14 +54,3 @@ jobs:
             !dist/**
             !.output/**
           enable_lint_tools: true
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-      # 让 npx 能跑到 eslint / biome
-      - uses: actions/checkout@v4
-      # 1) 安装项目自身的依赖（含已写入 package.json 的 eslint / @biomejs/biome）
-      - run: npm install --no-audit --no-fund
-      # 2) 兜底：即便 fixture 没把 lint 工具写进 package.json，也确保 runner 的
-      #    node_modules 里有这两个工具，避免 ai-reviewer 的 `npx --no-install` 失败。
-      #    --no-save 表示不污染 package.json；如果上一步已装好这里是 no-op。
-      - run: npm install --no-save --no-audit --no-fund eslint@^9 @biomejs/biome@^2
