@@ -45,27 +45,79 @@ cp "$SCRIPT_DIR/biome.json" biome.json
 echo "==> 写入 utils/lint-test-cart.ts"
 cp "$SCRIPT_DIR/lint-test-cart.ts" utils/lint-test-cart.ts
 
-# 4. 把 lint 工具写入 devDependencies（持久化到 package.json）
-#    注意：使用 --save-dev（不是 --no-save）— 这样 GitHub Actions runner 上的
-#    `npm install` 才能装上它们；ai-reviewer 通过 npx --no-install 才找得到。
-echo "==> 把 eslint + @biomejs/biome 写入 devDependencies"
-npm install --save-dev --silent eslint@^9 @biomejs/biome@^2 \
-  || echo "(installing eslint/biome failed; please run 'npm install --save-dev eslint@^9 @biomejs/biome@^2' manually)"
+# 4. 把 lint 工具写入 devDependencies（直接 patch package.json，避开 npm 解析）
+#
+#    历史教训：早期版本用 `npm install --save-dev --silent ... || echo "..."`，
+#    --silent 隐藏了 npm 的错误输出，|| echo 吞掉了退出码，nuxt 生态的
+#    ERESOLVE 冲突让 install 静默失败 → package.json 没动 → runner 上 npm
+#    install 装不到工具 → 适配器全部 _unavailable_。
+#
+#    现在改为：直接读写 package.json（绕过依赖解析），然后用 --legacy-peer-deps
+#    跑一次 install 把 node_modules 与可能的 lockfile 同步好，最后强制验证。
+echo "==> 写入 devDependencies: eslint@^9 + @biomejs/biome@^2 → package.json"
+node <<'NODE_EOF'
+const fs = require('fs');
+const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+pkg.devDependencies = pkg.devDependencies || {};
+const wanted = {
+  eslint: '^9.15.0',
+  '@biomejs/biome': '^2.3.0'
+};
+let changed = false;
+for (const [name, version] of Object.entries(wanted)) {
+  if (pkg.devDependencies[name] !== version) {
+    pkg.devDependencies[name] = version;
+    changed = true;
+  }
+}
+if (changed) {
+  fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+  console.log('  ✓ package.json updated');
+} else {
+  console.log('  ✓ package.json already has expected entries');
+}
+NODE_EOF
 
-# 5. 提交并推送（package.json / package-lock.json 一并提交以持久化依赖）
+# 强制验证：防御 node 脚本静默失败（写入异常时会让此处报错并退出）
+node -e '
+const d = (require("./package.json").devDependencies) || {};
+if (!d.eslint || !d["@biomejs/biome"]) {
+  console.error("✗ devDependencies 缺少 eslint 或 @biomejs/biome");
+  console.error("  当前 devDependencies:", JSON.stringify(d, null, 2));
+  process.exit(1);
+}
+console.log("  ✓ verified: eslint=" + d.eslint + ", @biomejs/biome=" + d["@biomejs/biome"]);
+'
+
+# 让本地 node_modules 与 package.json 对齐（可选；workflow 上的 npm install 也会做这一步）
+# --legacy-peer-deps 兜底 nuxt + eslint9 / vue 生态常见的 ERESOLVE 冲突
+echo "==> 本地 npm install (--legacy-peer-deps，兜底 ERESOLVE)"
+if ! npm install --legacy-peer-deps --no-audit --no-fund; then
+  echo "⚠ 本地 npm install 失败 — 不影响 PR 触发后 CI runner 重装；" >&2
+  echo "  但本地 npx eslint / biome 不可用。继续提交。" >&2
+fi
+
+# 5. 提交并推送（package.json 必须提交以持久化依赖，runner 才装得上）
 git add \
   .codesentinel.yaml \
   eslint.config.js \
   biome.json \
   utils/lint-test-cart.ts \
   package.json
-# package-lock.json 仅在存在时加入（兼容 yarn/pnpm 项目）
+# package-lock.json 仅在存在时加入（项目原本无 lockfile，npm install 会生成一个）
 [ -f package-lock.json ] && git add package-lock.json || true
-git commit -m "test(iter3): add linter/SAST integration scenarios
+
+# 重跑脚本时（feature/lint 已存在），暂存区可能没新变更——跳过 commit 而非报错
+if git diff --cached --quiet; then
+  echo "==> 暂存区无变更，跳过 git commit"
+else
+  git commit -m "test(iter3): add linter/SAST integration scenarios
 
 - introduce utils/lint-test-cart.ts with intentional ESLint/Biome violations
 - enable .codesentinel.yaml (eslint + biome, prettier off)
+- add eslint@^9 + @biomejs/biome@^2 to devDependencies (so the runner installs them)
 - minimal eslint.config.js + biome.json"
+fi
 
 echo "==> 推送分支并打开 PR"
 git push -u origin "$BRANCH"
