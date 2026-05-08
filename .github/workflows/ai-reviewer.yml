@@ -53,4 +53,9 @@ jobs:
           node-version: "20"
       # 让 npx 能跑到 eslint / biome
       - uses: actions/checkout@v4
+      # 1) 安装项目自身的依赖（含已写入 package.json 的 eslint / @biomejs/biome）
       - run: npm install --no-audit --no-fund
+      # 2) 兜底：即便 fixture 没把 lint 工具写进 package.json，也确保 runner 的
+      #    node_modules 里有这两个工具，避免 ai-reviewer 的 `npx --no-install` 失败。
+      #    --no-save 表示不污染 package.json；如果上一步已装好这里是 no-op。
+      - run: npm install --no-save --no-audit --no-fund eslint@^9 @biomejs/biome@^2
