@@ -1,29 +1,37 @@
-# 迭代三 · Linter/SAST 集成 — 端到端测试文档
+# 迭代三 · Linter/SAST 集成 — 端到端测试文档（v2 自带工具版）
 
 > **测试目标**: 在 `ai-reviewer-test` 仓库中通过真实 PR 验证 ai-reviewer 的 Linter/SAST
-> 集成（Phase 1：JavaScript/TypeScript）。
+> 集成。本版本采用**自带工具策略** —— 待审查项目无需安装 eslint/biome 包。
 >
 > **对应功能**: [05-iteration-linter-sast.md](../../codesentinel-docs/docs/product-plan/05-iteration-linter-sast.md)
 >
-> **技术设计**: [06-iteration-linter-sast-design.md](../../ai-reviewer/docs/06-iteration-linter-sast-design.md)
+> **技术设计**: [06-iteration-linter-sast-design.md](../../ai-reviewer/docs/06-iteration-linter-sast-design.md) /
+> [07-linter-sast-architecture.md](../../ai-reviewer/docs/07-linter-sast-architecture.md)
 >
-> **本测试覆盖**: ESLint + Biome 集成、变更行过滤、`.codesentinel.yaml` 配置、Prompt 注入、
-> 评论标注（🧰 Tools）、PR 摘要中的工具统计表、容错（缺工具时不阻塞审查）。
+> **本测试覆盖**:
+> - **零侧装依赖**：`package.json` 不变、`node_modules` 不必有 eslint/biome
+> - ESLint + Biome 集成（ai-reviewer 自动从 npm 装到 `/tmp` 沙箱）
+> - 变更行过滤、`.codesentinel.yaml` 配置（可选）
+> - Prompt 注入、评论标注（🧰 Tools）、PR 摘要中的工具统计表
+> - 容错（npm 不可达/install 失败时不阻塞审查）
 
 ---
 
-## 0. 概述
+## 0. 概述：相比 v1 的简化
 
-测试分为四步：
+| 维度 | v1（手动安装）— 已废弃 | v2（自带工具）— 当前 |
+|:-----|:---------------------|:-------------------|
+| 项目 `package.json` | 必须加 `eslint@^9` + `@biomejs/biome@^2` | **不动** |
+| Workflow `npm install` 步骤 | 必须 | **不需要** |
+| `actions/checkout` | 必须 | 必须 |
+| `biome.json` / `.codesentinel.yaml` | 推荐 | 全部**可选** |
+| 冷启动开销 | ~5s（`npm install`） | ~15s（首次安装到 `/tmp` 沙箱，后续 job 通过 GitHub Actions cache 可加速） |
 
-1. **检查/更新 workflow**：使 ai-reviewer 引用包含 Linter/SAST 集成的分支
-2. **应用测试代码改动**：拷贝带刻意 lint 问题的 TS 文件 + 配置
-3. **创建 PR 触发 CI**：观察 ai-reviewer 是否：
-   - 跑出 ESLint / Biome 的扫描结果
-   - 把工具发现注入 LLM Prompt 让 AI 交叉验证
-   - 在评论尾部附带 "🧰 Tools" 标注
-   - 在 PR 摘要中追加 "🧰 Static Analysis Summary" 表格
-4. **核对每个测试场景**：对照下文场景表逐项打勾
+测试方法：
+
+1. 一次性更新 workflow（仅需 setup-node + checkout + ai-reviewer 三步）
+2. 跑 `apply-changes.sh` 创建测试分支
+3. PR 触发 CI；按下文场景表逐项验证
 
 ---
 
@@ -31,8 +39,7 @@
 
 ### 1.1 Workflow 文件
 
-确保 `.github/workflows/ai-reviewer.yml` 引用的是包含 Linter/SAST 集成的 ai-reviewer 分支
-（如 `feature/lint-sast`），并且至少包含以下输入：
+把 `.github/workflows/ai-reviewer.yml` 改为**仅包含三步**（注意：v1 的 `npm install` 兜底不再需要）：
 
 ```yaml
 name: Code Review
@@ -50,6 +57,10 @@ on:
   issue_comment:
     types: [created]
 
+concurrency:
+  group: ${{ github.repository }}-${{ github.event.number || github.head_ref || github.sha }}-${{ github.workflow }}
+  cancel-in-progress: ${{ github.event_name != 'pull_request_review_comment' }}
+
 jobs:
   review:
     runs-on: ubuntu-latest
@@ -59,15 +70,9 @@ jobs:
     steps:
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: '20'
       - uses: actions/checkout@v4
-      # 1) 安装项目自身的依赖（含已写入 package.json 的 eslint / @biomejs/biome）
-      - run: npm install --no-audit --no-fund
-      # 2) 兜底：即便 fixture 没把 lint 工具写进 package.json，也确保 runner 的
-      #    node_modules 里有这两个工具，避免 ai-reviewer 的 `npx --no-install` 失败。
-      #    --no-save 表示不污染 package.json；如果上一步已装好这里是 no-op。
-      - run: npm install --no-save --no-audit --no-fund eslint@^9 @biomejs/biome@^2
-      - uses: CodesSentinels/ai-reviewer@feature/lint-sast
+      - uses: CodesSentinels/ai-reviewer@feature/lint
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -77,43 +82,48 @@ jobs:
           review_simple_changes: false
           review_comment_lgtm: false
           openai_heavy_model: gpt-5.4-mini
+          enable_shell: false
+          enable_web_search: false
+          enable_dependency_analysis: false
 ```
 
-> ⚠️ `enable_lint_tools` 是迭代三新增的总开关，默认 `true`。本测试显式写出来便于定位问题。
+> ⚠️ workflow 文件**所在分支必须能让 GitHub 读取到** —— 对 `pull_request` 事件来说，
+> workflow 文件来自 PR 分支；对 `pull_request_target` 来说来自 base 分支。
+> 当前测试用 `pull_request`，所以更新 PR 分支上的 workflow 即可。
 
 ### 1.2 测试用代码改动
-
-进入 `ai-reviewer-test` 后执行：
 
 ```bash
 cd ai-reviewer-test
 bash test_cases/iteration3-linter-sast/code-changes/apply-changes.sh
 ```
 
-脚本会：
+脚本只做四件事：
 
-1. 创建 `feature/lint` 分支
-2. 在仓库根写入：
-   - `.codesentinel.yaml`（开启 eslint + biome，关闭 prettier）
-   - `eslint.config.js`（最小 Flat Config）
-   - `biome.json`（最小 lint 配置）
+1. 创建/切到 `feature/lint` 分支
+2. 把 `eslint.config.js`（最小 Flat Config）拷贝到仓库根
 3. 在 `utils/lint-test-cart.ts` 写入故意带问题的 TS 代码
-4. 通过 **`npm install --save-dev`** 把 `eslint@^9` 与 `@biomejs/biome@^2`
-   写入 `package.json` 的 devDependencies，并把 `package.json` /
-   `package-lock.json` 一并 commit
-5. 提交、推送、创建 PR
+4. 提交 + 推送 + 创建 PR
 
-> ⚠️ **常见坑**：早期版本的脚本用 `--no-save`，工具仅留在本地 `node_modules`，
-> 不进 `package.json`。这会导致 GitHub Actions runner 上 `npm install` 装不到
-> 这两个工具，最终 PR 评论里 ESLint / Biome 都显示为
-> `_unavailable_ — eslint --version failed`。当前脚本已改用 `--save-dev`，
-> 同时 §1.1 workflow 中加了一道 `--no-save` 兜底安装作为保险。
+**`package.json` 不会被修改，`node_modules` 也不会动。**
+
+### 1.3 验证待审查项目"什么都没装"
+
+```bash
+cd ai-reviewer-test
+git checkout feature/lint
+grep -E '"eslint"|"@biomejs/biome"' package.json
+# 输出应为空（没有匹配） → 项目侧确实没装 lint 工具
+```
 
 ---
 
 ## 2. 测试场景列表
 
-每个场景包含：**预期工具发现** + **预期 AI 行为** + **观察点**。
+每个场景：**预期工具发现** + **预期 AI 行为** + **观察点**。
+
+> 通用前置：所有场景都基于"待审查项目自身没装 eslint/biome"这一事实。
+> ai-reviewer 启动时会在 runner 的 `/tmp/ai-reviewer-lint-tools/` 自动装这两个工具。
 
 ### 2.1 场景 A — `array-callback-return` + 业务逻辑错误（强 AI 用例）
 
@@ -121,49 +131,33 @@ bash test_cases/iteration3-linter-sast/code-changes/apply-changes.sh
 
 ```ts
 items.map((item) => {
-  total += item.quantity // 缺 return + 错把 quantity 当价格
+  total += item.quantity   // 缺 return + 错把 quantity 当价格
 })
 ```
 
 **预期工具发现**:
 
-| 工具   | 规则                                        | 严重级别 |
-| :----- | :------------------------------------------ | :------- |
-| ESLint | `array-callback-return`                     | error    |
-| Biome  | `lint/suspicious/useIterableCallbackReturn` | error    |
+| 工具 | 规则 | 严重级别 |
+|:----|:----|:--------|
+| ESLint | `array-callback-return` | error |
+| Biome | `lint/suspicious/useIterableCallbackReturn` | error |
 
 **预期 AI 行为**:
 
-- AI 必须对 `items.map(...)` 所在行写一条评论
-- 评论中必须命名工具（"ESLint"/"Biome"）并解释影响
-- AI 还必须指出**工具盲区中的业务逻辑错误**：累加 `item.quantity` 而非 `item.quantity * item.price`，导致总价完全错误
-- 评论尾部附带 "🧰 Tools" 卡片
+- 对 `items.map(...)` 行写一条评论
+- 命名工具（"ESLint reports …"）并解释影响
+- 额外指出**业务逻辑错误**（应 `* item.price`）
+- 评论尾部带 "🧰 Tools" 卡片
 
-**通过条件**: 评论同时覆盖了 lint 发现 **和** 业务逻辑错误。
+**通过条件**: 评论同时覆盖 lint 发现 **和** 业务逻辑错误。
 
 #### 2.1.x 排查方向：AI 漏判逻辑错误时
 
-如果 PR 评论里**完全没有**针对 `calculateTotal` 的行级评论（既没指出 lint 问题，
-也没指出业务逻辑），按以下顺序定位：
+按以下顺序定位：
 
-1. **看 GitHub Actions 日志中 `triage:` 那几行**
-   - `triage: NEEDS_REVIEW` → 文件进入了 review 阶段，问题在重量模型本身（继续步骤 2）
-   - `triage: APPROVED` → lightBot 把这次变更归类为"简单变更"跳过了 review，
-     这是最常见的漏判原因。临时缓解：把 workflow 的 `review_simple_changes` 改为 `true`
-     强制审查所有变更。
-
-2. **看日志里是否有 `lgtm` / `looks good to me` 字样**
-   - 重量模型可能产生了 LGTM 评论但被 `review_comment_lgtm: false` 过滤
-   - 临时把这个开关改为 `true`，重新触发 review 即可观察模型实际怎么看待这段代码
-
-3. **看 lint 工具是否 available**（统计表中 `_unavailable_` 字样）
-   - 工具失败时，prompt 中的 lint 区块整段为空（杠杆 A），MANDATORY 交叉验证指令
-     也不会拼入。模型只能靠通用审查规则发现问题，对纯业务语义错误（如本场景的
-     `quantity` 应该乘以 `price`）的命中率会下降。
-   - 修工具配置（详见 §1.1 与 §1.2 注意框）后再跑一次。
-
-4. **如果以上都正常但仍漏判**：把行级评论与你期望的对照截图发给我。这通常是
-   prompt 工程层面的问题，不是工具集成层。
+1. 看日志 `triage:` —— `APPROVED` 表示 lightBot 跳过了重量审查 → 临时把 `review_simple_changes` 设为 `true`
+2. 看日志是否有 `lgtm` —— 重量模型可能产了 LGTM 但被过滤
+3. 看统计表中 ESLint/Biome 是否 `_unavailable_` —— 工具失败时 prompt 里不拼 MANDATORY 指令
 
 ---
 
@@ -172,33 +166,24 @@ items.map((item) => {
 **目标代码**: `utils/lint-test-cart.ts::isValidItemId`
 
 ```ts
-const tempData = "reserved-for-future-use"
-if (id == null) return false
+const tempData = "reserved-for-future-use"   // 未使用
+if (id == null) return false                  // 应使用 ===
 ```
 
 **预期工具发现**:
 
-| 工具   | 规则                                 | 严重级别                   |
-| :----- | :----------------------------------- | :------------------------- |
-| ESLint | `no-unused-vars`                     | error（`tempData` 未使用） |
-| ESLint | `eqeqeq`                             | error（应使用 `===`）      |
-| Biome  | `lint/correctness/noUnusedVariables` | error                      |
-| Biome  | `lint/suspicious/noDoubleEquals`     | error                      |
+| 工具 | 规则 | 严重级别 |
+|:----|:----|:--------|
+| ESLint | `no-unused-vars` | error |
+| ESLint | `eqeqeq` | error |
+| Biome | `lint/correctness/noUnusedVariables` | error |
+| Biome | `lint/suspicious/noDoubleEquals` | error |
 
-**预期 AI 行为**:
-
-- 两个发现都对应到正确行
-- 跨工具去重生效：同一行 `tempData` 不应同时出现 ESLint 与 Biome 两条相同评论
-  （归一化规则名后视为同一问题，保留更高 severity）
-
-**通过条件**:
-
-- PR 摘要 "🧰 Static Analysis Summary" 表中 ESLint / Biome 各报告了 ≥ 1 个 error
-- 行级评论列出工具发现（`no-unused-vars` 与 `eqeqeq`/`noDoubleEquals`）
+**预期 AI 行为**: 两个发现都对应到正确行；跨工具去重生效（同一行 `tempData` 不应同时出现 ESLint 与 Biome 两条评论）。
 
 ---
 
-### 2.3 场景 C — `no-console` + 隐藏的去重/库存问题
+### 2.3 场景 C — `no-console` + 业务盲区
 
 **目标代码**: `utils/lint-test-cart.ts::addToCart`
 
@@ -207,233 +192,192 @@ console.log(`adding item to cart: ${item.id}`)
 cartItems.value.push(item)
 ```
 
-**预期工具发现**:
+**预期工具发现**: ESLint `no-console` (warning)
 
-| 工具   | 规则         | 严重级别 |
-| :----- | :----------- | :------- |
-| ESLint | `no-console` | warning  |
-
-**预期 AI 行为**:
-
-- AI 在该行评论中确认 console.log 是工具发现（warning 级别）
-- AI **必须额外指出**：直接 push 不去重 + 缺少库存上限校验（这是工具检测不到的业务规则缺失）
-
-**通过条件**: 评论同时包含工具确认 + 业务盲区补充。
+**预期 AI 行为**: 评论包含工具确认 + 业务盲区补充（"直接 push 不去重，缺少库存上限校验"）。
 
 ---
 
-### 2.4 场景 D — `URLSearchParams.map` 误用（与产品文档示例对齐）
+### 2.4 场景 D — `URLSearchParams.map` 误用（纯 AI 用例）
 
 **目标代码**: `utils/lint-test-cart.ts::debugQuery`
 
-```ts
-const params = new URL(url).searchParams as unknown as { ... }
-params.map((value, key) => { ... })
-```
+工具不会检出（因 `as unknown as` 让类型已变）。AI 应该指出 `URLSearchParams` 没有 `map`，建议 `forEach`。
 
-**预期工具发现**:
-
-- ESLint 默认规则集**不会**检出该问题（因 cast 后类型已变）
-- Biome 也不会检出
-- 这是**纯 AI 用例**：模型应识别 `URLSearchParams` 没有 `map` 方法，建议改用 `forEach`
-
-**预期 AI 行为**:
-
-- AI 写出明确的修复建议（`diff` 代码块），并指出运行时会崩溃
-- 由于工具未发现该问题，评论尾部**不会**有 "🧰 Tools" 卡片
-- 这验证了"工具盲区中由 AI 兜底"的能力
-
-**通过条件**: 评论指出 `URLSearchParams.map` 不存在，建议 `forEach`，且**没有**误造工具标注。
+**通过条件**: 评论指出错误并给出 `diff` 修复，且评论尾部**没有** `🧰 Tools` 卡片（因为没有工具发现）。
 
 ---
 
-### 2.5 场景 E — PR 摘要中的工具统计表
-
-**观察位置**: ai-reviewer 发布的最终 Summarize 评论尾部
+### 2.5 场景 E — PR 摘要的工具统计表
 
 **预期内容**:
 
-```markdown
-<details>
-<summary>🧰 Static Analysis Summary (2 tools)</summary>
-
-_N findings on changed lines._
+```
+🧰 Static Analysis Summary (2 tools)
 
 | Tool         | Errors | Warnings | Files Scanned | Duration |
-| :----------- | :----: | :------: | :-----------: | :------- |
-| ESLint 9.x.x |   ≥3   |    ≥1    |      ≥1       | <60000ms |
-| Biome 2.x.x  |   ≥3   |    0     |      ≥1       | <60000ms |
-
-</details>
+| ESLint 9.x.x |  ≥3   |    ≥1    |       ≥1      | <60000ms |
+| Biome 2.x.x  |  ≥3   |     0    |       ≥1      | <60000ms |
 ```
 
-**通过条件**:
-
-- 表格存在
-- 各工具统计与实际发现数量一致（误差范围 ±1，因为某些规则可能在新版本被合并）
-- Duration 列存在且为合理数值
+**通过条件**: 表格存在，工具版本可见，统计与实际发现数一致（误差 ±1）。
 
 ---
 
-### 2.6 场景 F — Prettier 关闭后不应出现在统计中
+### 2.6 场景 F — 验证零侧装：项目 `node_modules` 不含 lint 工具
 
-**前置**: `.codesentinel.yaml` 中 `prettier.enabled: false`
+**目标**: 显式验证"待审查项目什么都没装"这件事。
 
-**预期**:
+**触发方式**:
 
-- 统计表中**不出现** Prettier 行（被配置过滤掉，根本不进入 detect 阶段）
-- 日志中应有 `lint: 2/3 adapters enabled by config: [eslint, biome]` 之类的记录
+在跑 PR 触发的 workflow 之外，本地手动执行：
+
+```bash
+cd ai-reviewer-test
+git checkout feature/lint
+ls node_modules/ 2>&1 | head -5      # 项目 node_modules 内容
+ls node_modules/.bin/eslint 2>&1     # 应输出"No such file"
+ls node_modules/.bin/biome 2>&1      # 应输出"No such file"
+```
+
+**workflow 触发后查看 GitHub Actions 日志**:
+
+应能看到：
+
+```
+lint/installer: installing eslint@^9.15.0 → /tmp/ai-reviewer-lint-tools
+lint/installer: eslint ready at /tmp/ai-reviewer-lint-tools/node_modules/.bin/eslint
+lint/installer: installing @biomejs/biome@^2.3.0 → /tmp/ai-reviewer-lint-tools
+lint/installer: biome ready at /tmp/ai-reviewer-lint-tools/node_modules/.bin/biome
+lint/eslint: bundled bin=/tmp/ai-reviewer-lint-tools/node_modules/.bin/eslint, project config=eslint.config.js
+lint/biome: bundled bin=/tmp/ai-reviewer-lint-tools/node_modules/.bin/biome, zero-config OK
+```
+
+**通过条件**: 日志中工具的 `binPath` 都指向 `/tmp/ai-reviewer-lint-tools/`（沙箱），不是 `node_modules/.bin/`。
 
 ---
 
-### 2.7 场景 G — 工具不可用时的容错
+### 2.7 场景 G — npm 不可达时的容错
 
-**触发方式 G1**（二进制缺失）: 在 workflow 中**故意不安装** `@biomejs/biome`（删除 `npm install` 步骤或改成只安装 eslint）
+**触发方式**: 在 workflow 中**故意把 npm registry 替换为不可达地址**（仅测试时）：
 
-**预期**:
-
-- ESLint 仍正常工作并报告问题
-- Biome 在统计表中显示为 `_unavailable_`，并在 reason 列写出 `command not found: biome` 或类似信息
-- 整个 review 不被打断
-- 日志中能看到 `lint/biome: not available — ...` 的警告
-
-**触发方式 G2**（ESLint 项目无配置，改进 A）: 在测试分支根目录**删除 `eslint.config.js`** 与所有 `.eslintrc.*` 文件，保留 ESLint 二进制和 Biome 配置
+```yaml
+- run: npm config set registry http://127.0.0.1:1   # 故意指向不可达
+- uses: CodesSentinels/ai-reviewer@feature/lint
+  ...
+```
 
 **预期**:
 
-- ESLint 二进制 `npx eslint --version` 仍成功 → 二进制可用
-- 但 `EslintAdapter.detect()` 第二步检查项目配置时未找到任何配置文件
-- 统计表中 ESLint 行显示 `_unavailable_`，`reason` 列写出 `no ESLint config found in repo (looked for eslint.config.{js,mjs,cjs,ts,mts,cts}, .eslintrc.*, package.json#eslintConfig)`
-- Biome 仍正常工作（零配置可用）
-- 日志中能看到 `lint/eslint: not available — no ESLint config found in repo …` 的警告
+- 沙箱安装超时或连接失败
+- 统计表中 ESLint/Biome 都显示 `_unavailable_`，reason 列写：
+  > `bundled ESLint install failed: npm install eslint@^9.15.0 failed (exit=1): ...`
+- 整体 review 不被打断（AI 评论照常）
+- 跑完后**记得把 registry 改回**：`npm config delete registry`
 
-**通过条件**: 任一种"工具不可用"都不影响其他工具与整体审查流程，且原因在统计表中清晰可见。
+**通过条件**: 工具不可用不阻塞审查。
 
 ---
 
 ### 2.8 场景 H — 关闭整个 Lint 阶段
 
-**触发方式**: 在 workflow 输入中加 `enable_lint_tools: false`，重新跑同一 PR
+```yaml
+with:
+  enable_lint_tools: false
+```
 
 **预期**:
 
 - 日志：`Phase 0b: lint tools disabled by config, skipping`
-- PR 摘要中**没有** "🧰 Static Analysis Summary" 区块
+- PR 摘要中**没有** "🧰 Static Analysis Summary"
 - 行级评论尾部**没有** "🧰 Tools" 标注
-- 仅 AI 自然分析的内容存在
+- 沙箱安装也不会触发（节省时间）
 
 ---
 
 ### 2.9 场景 I — 变更行过滤
 
-**触发方式**: 在 `utils/lint-test-cart.ts` 已有的 PR 上，**只**修改某个无问题的注释行；
-观察 ai-reviewer 的扫描结果
+**触发方式**: 在 PR 上追加一个"只改注释"的 commit。
 
-**预期**:
-
-- 工具确实扫描了整个文件（ESLint/Biome 输出仍包含原有问题）
-- 但 PR 摘要表中"findings on changed lines" 计数 = 0 或仅命中变更行附近 ±3 行的问题
-- 行级评论中**只有**变更行附近的工具标注
-
-**通过条件**: 工具发现没有"全文件刷屏"。
+**预期**: 工具仍扫描整个文件，但只有变更行附近 ±3 行的发现进入评论。统计表"findings on changed lines"反映实际命中数。
 
 ---
 
-### 2.10 场景 J — `.codesentinel.yaml` 缺失时的回退
+### 2.10 场景 J — 项目无 ESLint 配置时的行为
 
-**触发方式**: 在另一分支删除 `.codesentinel.yaml`，保留 eslint.config.js + biome.json，
-重新触发 review
+**触发方式**: 手动从分支删除 `eslint.config.js`，重新触发 review。
 
 **预期**:
 
-- 日志：`lint config: no .codesentinel.yaml found, using adapter defaults`
-- ESLint + Biome 仍按各自的 `defaultEnabled=true` 启用
-- Prettier 因 `defaultEnabled=false` 仍不启用
-- 行为与场景 E 一致
+- 沙箱安装 ESLint 成功
+- 但 `EslintAdapter.detect()` 检测到无 config → 返回 `available: false`
+- 统计表中 ESLint 显示 `_unavailable_`，reason 列：
+  > `no ESLint config found in repo (looked for eslint.config.{js,mjs,cjs,ts,mts,cts}, .eslintrc.*, package.json#eslintConfig)`
+- Biome 仍正常工作（零配置）
+
+**通过条件**: ESLint 优雅降级，Biome 不受影响。
 
 ---
 
-### 2.11 场景 K — 杠杆 A：无 finding 文件不消耗 prompt token
+### 2.11 场景 K — 杠杆 A：无 finding 文件零 token 浪费
 
-**目标**: 验证 `prompts.renderReviewFileDiff` 在 `inputs.lintContext` 为空时，
-**整体移除** "Static analysis tool results" 段头与 "Static analysis cross-validation
-(MANDATORY ...)" 指令，节省每次 doReview ~300 token。
+**触发方式**: 在 PR 中混合"有问题的 ts 文件"和"干净的 ts 文件"。
 
-**触发方式**: 在 PR 中混合两类文件：
+预期：干净文件的 doReview prompt 中**不包含** "Static analysis tool results" 段头与 MANDATORY 指令；调试日志中 `injected lint context for ...` 仅对有 finding 的文件出现。
 
-1. `utils/lint-test-cart.ts` — 含 4 类工具发现（场景 A-D）
-2. `utils/no-issue-utils.ts` — 一个干净的 TS 文件（自定义内容，故意写零问题）
+---
 
-```ts
-// utils/no-issue-utils.ts
-export function clamp(n: number, lo: number, hi: number): number {
-  return Math.max(lo, Math.min(hi, n))
-}
-```
+### 2.12 场景 L — 工具沙箱缓存命中
 
-确保 ESLint + Biome 对它都报告 0 finding，且打开 `debug: true` 让 ai-reviewer 输出
-`prompts so far` 等 debug 日志。
+**触发方式**: 在同一 PR 上连续 push 两个 commit。
 
 **预期**:
 
-| 文件                | 是否注入 lint 段头 | 是否注入 MANDATORY 指令 | 工具发现条数 |
-| :------------------ | :----------------- | :---------------------- | :----------- |
-| `lint-test-cart.ts` | ✅ 注入            | ✅ 注入                 | ≥ 5          |
-| `no-issue-utils.ts` | ❌ 不注入          | ❌ 不注入               | 0            |
+- 第一个 commit 的 review：日志显示 `lint/installer: installing ...`（首次安装）
+- 第二个 commit 的 review：日志显示 `lint/installer: cache hit for eslint → ...`（同一 runner job 内复用沙箱）
 
-观察 GitHub Action 的 debug 日志：
+> ⚠️ 跨 job 默认不缓存。如需跨 job 缓存以省 ~15s，在 workflow 加：
+>
+> ```yaml
+> - uses: actions/cache@v4
+>   with:
+>     path: /tmp/ai-reviewer-lint-tools
+>     key: ai-reviewer-lint-tools-${{ runner.os }}-eslint9-biome2
+> ```
 
-- `lint-test-cart.ts` 的 doReview 日志中：`injected lint context for utils/lint-test-cart.ts: NN tokens`
-- `no-issue-utils.ts` 的 doReview 日志中：**不会出现** `injected lint context for ...`
-- 两个文件分别走 `Prompts.renderReviewFileDiff` 时，
-  `lint-test-cart.ts` 的 prompt 必须包含字符串 `"Static analysis cross-validation (MANDATORY"`，
-  而 `no-issue-utils.ts` 的 prompt **必须不包含**该字符串
-
-**通过条件**:
-
-- 评论结果上：两文件都被审查；干净文件没有"幻觉式"的工具评论（因为 prompt 中根本没提"工具"）
-- 摘要表中：ESLint/Biome 各报告 ≥ 1 个 finding（来自 `lint-test-cart.ts`），
-  与 `no-issue-utils.ts` 无关
-- token 节省：在调试日志中可对比两文件的 prompt 长度，干净文件的 prompt 应短约 1.0-1.5 KB
-
-**单元测试**: 该条件路径已被
-[`__tests__/lint-prompt-injection.test.ts`](../../ai-reviewer/__tests__/lint-prompt-injection.test.ts)
-固化（4 个用例），可在本地直接验证：
-
-```bash
-cd ../ai-reviewer
-npm test -- __tests__/lint-prompt-injection.test.ts
-```
+**通过条件**: 第二个 commit 的工具相关日志体现了"cache hit"，且 PR 评论仍正确包含 lint 发现。
 
 ---
 
 ## 3. 测试执行顺序建议
 
-| 步骤 | 场景                | 备注                                                     |
-| :--- | :------------------ | :------------------------------------------------------- |
-| 1    | A、B、C、D、E、F、K | 一次主 PR 同时覆盖；最常用（K 需在该 PR 内追加干净文件） |
-| 2    | G                   | 临时改 workflow 跑空 ESLint 时验证容错                   |
-| 3    | H                   | 改输入参数验证总开关                                     |
-| 4    | I                   | 在已有 PR 上追加无关 commit 验证变更行过滤               |
-| 5    | J                   | 删除 `.codesentinel.yaml` 验证默认值回退                 |
+| 步骤 | 场景 | 备注 |
+|:-----|:-----|:-----|
+| 1 | A、B、C、D、E、K | 主 PR 一次性覆盖 |
+| 2 | F | PR 触发后查日志即可，无额外操作 |
+| 3 | L | 在主 PR 上 push 一个无关 commit 触发第二次 review |
+| 4 | I | 在主 PR 上追加只改注释的 commit |
+| 5 | J | 删除 `eslint.config.js` 触发新 review |
+| 6 | H | 改 workflow 输入参数 |
+| 7 | G | （可选，破坏性较强）改 npm registry |
 
 ---
 
 ## 4. 失败排查
 
-| 现象                         | 可能原因                                       | 排查                                               |
-| :--------------------------- | :--------------------------------------------- | :------------------------------------------------- |
-| 没有任何 lint 评论           | `enable_lint_tools=false` 或 workflow 没装工具 | 查日志 `Phase 0b` 行                               |
-| 工具统计表全部 _unavailable_ | `npx --no-install` 找不到工具                  | 确认 workflow 跑过 `npm install`                   |
-| 评论尾部 "🧰 Tools" 卡片缺失 | 工具发现不在评论行号范围内                     | 查日志 `injected lint context for ...`             |
-| Biome JSON 解析失败          | Biome 版本输出格式变化                         | 检查日志 `lint: failed to parse JSON`              |
-| ESLint 报"No files matching" | `eslint.config.js` 没生效                      | 确认 Flat Config 文件名正确，`type: "module"` 已设 |
+| 现象 | 可能原因 | 排查 |
+|:-----|:---------|:-----|
+| 没有 lint 评论 | `enable_lint_tools=false` 或工具安装失败 | 看日志 Phase 0b 区段 |
+| 统计表全 `_unavailable_`，reason 含 "npm install ... failed" | runner 无法访问 npm | 见场景 G 分析；自托管 runner 需配置 npm 镜像 |
+| 统计表中 ESLint 显示 `no ESLint config found` | 项目没有 `eslint.config.js` | 加一个最小 Flat Config（参考 `test_cases/iteration3-linter-sast/code-changes/eslint.config.js`） |
+| 评论尾部 `🧰 Tools` 卡片缺失 | 工具发现行号不在评论范围内 | 查日志 `injected lint context for ...` |
+| 冷启动 60s 仍超时 | runner 网络极慢 | 提高 `INSTALL_TIMEOUT_MS`（在 ai-reviewer 的 `tool-installer.ts`），或本地预装 + 用 `actions/cache` 持久化 |
 
 ---
 
 ## 5. 单元测试入口
 
-仓库内还附带四组单元测试，可在 ai-reviewer 本地直接跑（不依赖 GitHub）：
+仓库内附带五组单元测试，可在 ai-reviewer 本地直接跑：
 
 ```bash
 cd ../ai-reviewer
@@ -441,33 +385,35 @@ npm test -- \
   __tests__/lint-diff-filter.test.ts \
   __tests__/lint-orchestrator.test.ts \
   __tests__/lint-prompt-injection.test.ts \
-  __tests__/lint-eslint-config-detection.test.ts
+  __tests__/lint-eslint-config-detection.test.ts \
+  __tests__/lint-tool-installer.test.ts
 ```
 
 预期：
 
-- `lint-diff-filter.test.ts`：8 个用例全部通过（unified diff 行号提取、变更窗口过滤、跨工具去重）
-- `lint-orchestrator.test.ts`：4 个用例全部通过（启用/禁用、不可用工具、抛异常容错、disabled 短路）
-- `lint-prompt-injection.test.ts`：4 个用例全部通过（杠杆 A：lintContext 空/非空两条路径、空白字符容忍、token 节省下界）
-- `lint-eslint-config-detection.test.ts`：7 个用例全部通过（改进 A：Flat Config / Legacy / package.json#eslintConfig / 损坏 package.json / 全部缺失）
+| 测试文件 | 用例数 |
+|:--------|:------|
+| `lint-diff-filter.test.ts` | 8 |
+| `lint-orchestrator.test.ts` | 4 |
+| `lint-prompt-injection.test.ts` | 4 |
+| `lint-eslint-config-detection.test.ts` | 7 |
+| `lint-tool-installer.test.ts` | **7（新增，多策略 dispatcher）** |
 
-合并后 ai-reviewer 全部测试 205 个均通过。
+ai-reviewer 全部测试 220 个用例均通过。
 
 ---
 
 ## 6. 验收清单
 
-| 验收项                                  | 通过标准                                                |
-| :-------------------------------------- | :------------------------------------------------------ |
-| ✅ 框架可扩展                           | 新增工具仅需实现 ToolAdapter                            |
-| ✅ ESLint 集成                          | 场景 A/B/C 中 ESLint 发现正确反映                       |
-| ✅ Biome 集成                           | 场景 A/B 中 Biome 发现正确反映                          |
-| ✅ 变更行过滤                           | 场景 I 通过                                             |
-| ✅ 结果注入 LLM                         | 场景 A/B/C 中 AI 评论命名工具并解释                     |
-| ✅ AI 交叉验证                          | 场景 A/C 中 AI 同时覆盖工具发现 + 工具盲区              |
-| ✅ 配置化                               | 场景 F/J 通过                                           |
-| ✅ 总开关                               | 场景 H 通过                                             |
-| ✅ 性能                                 | 各工具 Duration 列均 < 60s，统计表合计 < 3min           |
-| ✅ 错误容忍                             | 场景 G 通过                                             |
-| ✅ 杠杆 A：无 finding 文件零 token 浪费 | 场景 K 通过；`lint-prompt-injection.test.ts` 4 用例通过 |
-| ✅ 改进 A：ESLint 项目无配置时优雅降级 | 场景 G2 通过；`lint-eslint-config-detection.test.ts` 7 用例通过 |
+| 验收项 | 通过标准 |
+|:-------|:---------|
+| ✅ 项目侧零负担 | 场景 F 通过：`package.json` 不含 lint 工具，`node_modules` 中没有它们的 bin |
+| ✅ 自带工具有效 | 场景 E + F：统计表显示 ESLint 9.x / Biome 2.x，binPath 指向 `/tmp/ai-reviewer-lint-tools/` |
+| ✅ 缓存复用 | 场景 L：同 job 内第二次调用日志含 "cache hit" |
+| ✅ 工具发现注入 LLM | 场景 A/B/C：AI 评论命名工具并解释 |
+| ✅ AI 交叉验证 | 场景 A/C：评论同时覆盖工具发现 + 工具盲区 |
+| ✅ ESLint 项目无配置时优雅降级 | 场景 J 通过 |
+| ✅ npm 不可达时不阻塞 | 场景 G：reason 列清晰，AI 审查照常 |
+| ✅ 总开关 | 场景 H 通过 |
+| ✅ 杠杆 A：无 finding 文件零 token 浪费 | 场景 K 通过 |
+| ✅ 变更行过滤 | 场景 I 通过 |

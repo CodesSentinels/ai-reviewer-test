@@ -30,8 +30,6 @@ jobs:
         with:
           node-version: "20"
       - uses: actions/checkout@v4
-      - run: npm install --legacy-peer-deps --no-audit --no-fund
-      - run: npm install --no-save --legacy-peer-deps --no-audit --no-fund eslint@^9 @biomejs/biome@^2
       - uses: CodesSentinels/ai-reviewer@feature/lint
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
