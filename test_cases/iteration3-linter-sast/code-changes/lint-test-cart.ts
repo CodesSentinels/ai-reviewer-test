@@ -76,3 +76,23 @@ export function debugQuery(url: string): void {
     console.log(`${key}=${value}`)
   })
 }
+
+/**
+ * Bug 8（仅 tsc 能抓到）：访问 CartItem 上不存在的属性
+ *   ESLint / Biome 不做类型推导，看不出 item.nonExistentField 在类型上不合法。
+ *   tsc 应报：TS2339 Property 'nonExistentField' does not exist on type 'CartItem'.
+ */
+export function logCartItemDebug(item: CartItem): void {
+  console.log(`debug: ${item.nonExistentField}`)
+}
+
+/**
+ * Bug 9（仅 tsc 能抓到）：调用方参数类型不匹配
+ *   传入 string 给一个声明为 number 的参数。
+ *   tsc 应报：TS2345 Argument of type 'string' is not assignable to parameter of type 'number'.
+ */
+export function priceLabel(price: number): string {
+  return `¥${price.toFixed(2)}`
+}
+
+const _wrongLabel = priceLabel('19.99')

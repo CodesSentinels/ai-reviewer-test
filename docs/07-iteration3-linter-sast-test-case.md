@@ -349,17 +349,122 @@ with:
 
 ---
 
+### 2.13 场景 M — TypeScript Compiler 类型错误（仅 tsc 能抓）
+
+**目标代码**: `utils/lint-test-cart.ts` 中的 Bug 8 / Bug 9（apply-changes.sh 已写入）
+
+```ts
+// Bug 8: 访问不存在的属性
+export function logCartItemDebug(item: CartItem): void {
+  console.log(`debug: ${item.nonExistentField}`)   // TS2339
+}
+
+// Bug 9: 调用方传入错误类型
+export function priceLabel(price: number): string {
+  return `¥${price.toFixed(2)}`
+}
+const _wrongLabel = priceLabel('19.99')             // TS2345
+```
+
+**预期工具发现**:
+
+| 工具 | 规则 | 严重级别 |
+|:----|:----|:--------|
+| **TypeScript** | `TS2339` (Property 'nonExistentField' does not exist on type 'CartItem') | error |
+| **TypeScript** | `TS2345` (Argument of type 'string' is not assignable to parameter of type 'number') | error |
+
+**ESLint / Biome 不会检出**（它们不做类型推导）。
+
+**预期 AI 行为**:
+
+- 在两个错误所在行各写一条评论
+- 命名工具（"TypeScript reports …"）并解释影响
+- 评论尾部带 `🧰 Tools` 卡片，列出对应的 `TS2339` / `TS2345`
+
+**预期 PR 摘要表**:
+
+```
+| Tool                | Errors      | Warnings | Files Scanned | Duration |
+| ESLint 9.x.x        |  ≥3         |    ≥1    |       ≥1      |  <60000ms |
+| Biome 2.x.x         |  ≥3         |     0    |       ≥1      |  <60000ms |
+| TypeScript 5.x.x    |  ≥2 / ≥30   |     0    |       1       | <90000ms  |   ← 新增
+```
+
+> 📌 **Errors / Warnings 列读法**：`X / Y` 表示"进入 PR 评论的 X 个 / 工具原始扫描到的 Y 个"。
+> 当两者相等时表格中只会写一个数字。
+>
+> - **ESLint / Biome**：扫描的范围 = 变更文件 → 几乎所有 finding 都跟变更相关 → 通常 X = Y，只显示一个数
+> - **TypeScript**：tsc 必须扫整个项目（types are inferred transitively），所以 Y 会包含
+>   存量错误（与本次 PR 无关）。变更行过滤后，**X 才是真正写到 PR 评论的数量**。
+>   测试 fixture 中 Bug 8/9 落在变更行上 → X ≥ 2；项目其他位置可能有几十个存量 TS 错误 → Y 较大。
+
+> ⚠️ TypeScript 行的 "Files Scanned" 显示为变更文件中扩展名匹配的数量（典型为 1）；
+> 实际上 tsc 扫整个项目，列名仅供参考。这是已知行为。
+
+**项目无 `tsconfig.json` 时**: 与 ESLint 同款回退，统计表中 TypeScript 显示
+`_unavailable_ — no tsconfig.json found in repo (looked for tsconfig.json, tsconfig.base.json, tsconfig.app.json)`。
+ai-reviewer-test 是 Nuxt 项目，已有 `tsconfig.json`，应能正常工作。
+
+**通过条件**:
+
+- TypeScript 在统计表中 available
+- Errors 列**必须**显示 `X / Y` 形式（X≥2, Y≥X，且 Y 远大于 X 是正常的，说明项目有存量错误）
+- 表格下方应有"Errors / Warnings 列读法"图例自动出现
+- Bug 8 / Bug 9 都收到行级评论，且评论引用了 `TS2339` / `TS2345` 规则码
+- 与 ESLint/Biome 的发现互不重复（去重机制对 tsc 的 ruleId 也生效）
+
+#### 2.13.x 排查方向：tsc 报了很多 errors 但评论里只看到几条
+
+这是**预期行为**，不是 bug：tsc 项目级扫描会捕获所有现存的类型错误，但 PR 评论
+仅保留"落在你这次改动的行附近"的发现。具体核对：
+
+1. 看统计表 Errors 列：是 `X / Y` 形式吗？X 才是评论数，Y 是项目总数。
+2. 看 PR 评论：tsc 发现的评论行号应该都靠近你这次 commit 改动的行。
+3. 想看完整的 43 条错误？用 `git checkout feature/lint && npx tsc --noEmit` 在本地跑。
+4. 想清理项目存量错误？这是另外的工作，本次 PR 范围之外。
+
+---
+
+### 2.14 场景 N — 启用 Prettier（默认关闭，验证可开启）
+
+**前置**: Prettier 默认 `defaultEnabled = false`，统计表中**不会出现** Prettier 行。
+
+**触发方式**: 在仓库根创建 `.codesentinel.yaml`：
+
+```yaml
+tools:
+  prettier:
+    enabled: true
+```
+
+push 触发 review。
+
+**预期**:
+
+- 统计表新增 Prettier 行（"3 tools" 变成 "4 tools"）
+- 如果 `lint-test-cart.ts` 不符合 Prettier 默认格式，会得到 `prettier/format` warning（行号 = 1，文件级）
+
+**通过条件**: Prettier 出现在统计表中 + 至少一条 finding（如果文件确实不合格式）。
+
+**注意**:
+
+- Prettier 默认关闭的设计意图是减少噪音 —— ESLint/Biome 已覆盖大部分有价值的格式规则
+- 如团队用 pre-commit hook 处理 Prettier，建议保持默认关闭，避免 PR 评论被 "file is not formatted" 刷屏
+
+---
+
 ## 3. 测试执行顺序建议
 
 | 步骤 | 场景 | 备注 |
 |:-----|:-----|:-----|
-| 1 | A、B、C、D、E、K | 主 PR 一次性覆盖 |
+| 1 | A、B、C、D、E、K、**M** | 主 PR 一次性覆盖（M 是新增的 tsc 类型错误，apply-changes.sh 已包含 Bug 8/Bug 9） |
 | 2 | F | PR 触发后查日志即可，无额外操作 |
 | 3 | L | 在主 PR 上 push 一个无关 commit 触发第二次 review |
 | 4 | I | 在主 PR 上追加只改注释的 commit |
 | 5 | J | 删除 `eslint.config.js` 触发新 review |
-| 6 | H | 改 workflow 输入参数 |
-| 7 | G | （可选，破坏性较强）改 npm registry |
+| 6 | **N** | 在仓库根加 `.codesentinel.yaml` 开启 Prettier（可选） |
+| 7 | H | 改 workflow 输入参数 |
+| 8 | G | （可选，破坏性较强）改 npm registry |
 
 ---
 
@@ -377,7 +482,7 @@ with:
 
 ## 5. 单元测试入口
 
-仓库内附带五组单元测试，可在 ai-reviewer 本地直接跑：
+仓库内附带六组单元测试，可在 ai-reviewer 本地直接跑：
 
 ```bash
 cd ../ai-reviewer
@@ -386,7 +491,8 @@ npm test -- \
   __tests__/lint-orchestrator.test.ts \
   __tests__/lint-prompt-injection.test.ts \
   __tests__/lint-eslint-config-detection.test.ts \
-  __tests__/lint-tool-installer.test.ts
+  __tests__/lint-tool-installer.test.ts \
+  __tests__/lint-tsc-adapter.test.ts
 ```
 
 预期：
@@ -397,9 +503,10 @@ npm test -- \
 | `lint-orchestrator.test.ts` | 4 |
 | `lint-prompt-injection.test.ts` | 4 |
 | `lint-eslint-config-detection.test.ts` | 7 |
-| `lint-tool-installer.test.ts` | **7（新增，多策略 dispatcher）** |
+| `lint-tool-installer.test.ts` | 7（多策略 dispatcher） |
+| `lint-tsc-adapter.test.ts` | **10（新增，TypeScript 适配器）** |
 
-ai-reviewer 全部测试 220 个用例均通过。
+ai-reviewer 全部测试 230 个用例均通过。
 
 ---
 
@@ -417,3 +524,5 @@ ai-reviewer 全部测试 220 个用例均通过。
 | ✅ 总开关 | 场景 H 通过 |
 | ✅ 杠杆 A：无 finding 文件零 token 浪费 | 场景 K 通过 |
 | ✅ 变更行过滤 | 场景 I 通过 |
+| ✅ TypeScript 类型错误覆盖 | 场景 M 通过：tsc 抓到 Bug 8/9 的 TS2339/TS2345，与 ESLint/Biome 不重复，统计表 Errors 列以 `X / Y` 区分变更行评论数与项目总数 |
+| ✅ Prettier 可按需启用 | 场景 N 通过：`.codesentinel.yaml` 开启后统计表新增 Prettier 行 |
