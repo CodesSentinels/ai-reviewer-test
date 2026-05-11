@@ -489,7 +489,7 @@ push 触发 review。
 ```bash
 cd ../ai-reviewer
 npm test -- \
-  __tests__/lint-diff-filter.test.ts \
+  __tests__/lint-filter.test.ts \
   __tests__/lint-orchestrator.test.ts \
   __tests__/lint-prompt-injection.test.ts \
   __tests__/lint-eslint-config-detection.test.ts \
@@ -501,7 +501,7 @@ npm test -- \
 
 | 测试文件 | 用例数 |
 |:--------|:------|
-| `lint-diff-filter.test.ts` | 8 |
+| `lint-filter.test.ts` | 8 |
 | `lint-orchestrator.test.ts` | 4 |
 | `lint-prompt-injection.test.ts` | 4 |
 | `lint-eslint-config-detection.test.ts` | 7 |
