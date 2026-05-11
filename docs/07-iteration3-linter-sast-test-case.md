@@ -11,7 +11,7 @@
 > **本测试覆盖**:
 > - **零侧装依赖**：`package.json` 不变、`node_modules` 不必有 eslint/biome
 > - ESLint + Biome 集成（ai-reviewer 自动从 npm 装到 `/tmp` 沙箱）
-> - 变更行过滤、`.codesentinel.yaml` 配置（可选）
+> - 变更行过滤、Action 输入 per-tool 开关（消费方零配置文件）
 > - Prompt 注入、评论标注（🧰 Tools）、PR 摘要中的工具统计表
 > - 容错（npm 不可达/install 失败时不阻塞审查）
 
@@ -24,7 +24,7 @@
 | 项目 `package.json` | 必须加 `eslint@^9` + `@biomejs/biome@^2` | **不动** |
 | Workflow `npm install` 步骤 | 必须 | **不需要** |
 | `actions/checkout` | 必须 | 必须 |
-| `biome.json` / `.codesentinel.yaml` | 推荐 | 全部**可选** |
+| `biome.json` / `.codesentinel.yaml` | 推荐 | **全部已不再支持**：开关全部通过 Action 输入 `enable_eslint` / `enable_biome` / `enable_tsc` / `enable_prettier` 控制 |
 | 冷启动开销 | ~5s（`npm install`） | ~15s（首次安装到 `/tmp` 沙箱，后续 job 通过 GitHub Actions cache 可加速） |
 
 测试方法：
@@ -425,16 +425,17 @@ ai-reviewer-test 是 Nuxt 项目，已有 `tsconfig.json`，应能正常工作�
 
 ---
 
-### 2.14 场景 N — 启用 Prettier（默认关闭，验证可开启）
+### 2.14 场景 N — 启用 Prettier（默认关闭，验证可经 Action 输入开启）
 
 **前置**: Prettier 默认 `defaultEnabled = false`，统计表中**不会出现** Prettier 行。
 
-**触发方式**: 在仓库根创建 `.codesentinel.yaml`：
+**触发方式**: 在 `.github/workflows/ai-reviewer.yml` 的 `with:` 块加一行：
 
 ```yaml
-tools:
-  prettier:
-    enabled: true
+- uses: CodesSentinels/ai-reviewer@feature/lint
+  with:
+    enable_prettier: true     # ← 一行就够
+    # （消费方仓库**不需要**任何配置文件 —— 没有 .codesentinel.yaml、没有 .prettierrc）
 ```
 
 push 触发 review。
@@ -450,6 +451,7 @@ push 触发 review。
 
 - Prettier 默认关闭的设计意图是减少噪音 —— ESLint/Biome 已覆盖大部分有价值的格式规则
 - 如团队用 pre-commit hook 处理 Prettier，建议保持默认关闭，避免 PR 评论被 "file is not formatted" 刷屏
+- 同理可一行关掉任何工具：`enable_biome: false` / `enable_tsc: false` / `enable_eslint: false`
 
 ---
 
@@ -462,7 +464,7 @@ push 触发 review。
 | 3 | L | 在主 PR 上 push 一个无关 commit 触发第二次 review |
 | 4 | I | 在主 PR 上追加只改注释的 commit |
 | 5 | J | 删除 `eslint.config.js` 触发新 review |
-| 6 | **N** | 在仓库根加 `.codesentinel.yaml` 开启 Prettier（可选） |
+| 6 | **N** | 在 workflow.yml 的 `with:` 加 `enable_prettier: true` 开启 Prettier（可选） |
 | 7 | H | 改 workflow 输入参数 |
 | 8 | G | （可选，破坏性较强）改 npm registry |
 
@@ -525,4 +527,4 @@ ai-reviewer 全部测试 230 个用例均通过。
 | ✅ 杠杆 A：无 finding 文件零 token 浪费 | 场景 K 通过 |
 | ✅ 变更行过滤 | 场景 I 通过 |
 | ✅ TypeScript 类型错误覆盖 | 场景 M 通过：tsc 抓到 Bug 8/9 的 TS2339/TS2345，与 ESLint/Biome 不重复，统计表 Errors 列以 `X / Y` 区分变更行评论数与项目总数 |
-| ✅ Prettier 可按需启用 | 场景 N 通过：`.codesentinel.yaml` 开启后统计表新增 Prettier 行 |
+| ✅ Prettier 可按需启用 | 场景 N 通过：workflow.yml 写 `with: enable_prettier: true` 后统计表新增 Prettier 行 |

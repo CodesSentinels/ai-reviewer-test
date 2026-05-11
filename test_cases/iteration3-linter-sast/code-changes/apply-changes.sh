@@ -9,7 +9,8 @@
 # 与 v1（manual-install）的差异:
 #   - 待审查项目**无需**把 eslint / @biomejs/biome 写入 devDependencies
 #   - 待审查项目**无需** biome.json（Biome 零配置可用）
-#   - 待审查项目**无需** .codesentinel.yaml（默认就启用 eslint + biome）
+#   - 待审查项目**无需任何配置文件**（.codesentinel.yaml 已彻底移除；
+#     工具开关全部通过 workflow.yml 里的 `with: enable_*: true|false` 控制）
 #   - 仅保留一份最小 eslint.config.js（ESLint 9 必需）
 #
 # ai-reviewer 启动时会自动把 eslint + @biomejs/biome 装到 runner 的
