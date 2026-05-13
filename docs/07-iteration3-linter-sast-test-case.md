@@ -455,6 +455,98 @@ push 触发 review。
 
 ---
 
+### 2.15 场景 O — 工具版本覆盖（避免双侧版本错配）
+
+**目标**: 验证消费方可以在 workflow.yml 里 pin 工具版本，让 ai-reviewer
+runner 上装的工具与本地一致，避免"我本地能过，PR review 报新错"的尴尬。
+
+**前置背景**: 默认情况下 ai-reviewer 自带 pin 的版本是：
+
+| 工具 | 默认版本 |
+|:----|:--------|
+| ESLint | `^9.15.0` |
+| Biome | `^2.3.0` |
+| TypeScript | `^5.6.0` |
+| Prettier | `^3.0.0` |
+
+如果消费方本地用的版本与上面不一致（比如还在 ESLint 8 era），他们会看到 PR
+review 出现本地没有的报错。**场景 O 用于验证版本覆盖机制能解决这个问题**。
+
+#### 2.15.a 触发方式 A — 显式 pin TypeScript 5.4
+
+在 `.github/workflows/ai-reviewer.yml` 的 `with:` 块加一行：
+
+```yaml
+- uses: CodesSentinels/ai-reviewer@feature/lint
+  with:
+    enable_lint_tools: true
+    tsc_version: '~5.4.0'         # ← 强制装 TS 5.4.x
+```
+
+push 触发 review。
+
+**预期**:
+
+- 日志里能看到 `lint/installer: installing typescript@~5.4.0 → /tmp/ai-reviewer-lint-tools`
+- 安装完成的二进制跑 `tsc --version` 输出 `Version 5.4.x`（非默认的 5.6.x）
+- PR 摘要表中 TypeScript 行版本号显示为 `5.4.x` 而非默认值
+- 类型检查结果按 TS 5.4 的语义来（比如 5.5+ 才引入的某些类型推导优化在 5.4 不可用，可能产生不同的发现）
+
+#### 2.15.b 触发方式 B — 覆盖到旧 major（边缘情况）
+
+```yaml
+with:
+  eslint_version: '^8.57.0'       # ← 强制用 ESLint 8
+```
+
+**预期**:
+
+- 日志：`lint/installer: installing eslint@^8.57.0 → /tmp/ai-reviewer-lint-tools`
+- PR 摘要表显示 `ESLint 8.x.x` 版本号
+- ESLint 8 不再使用 Flat Config 优先 — 若项目 `eslint.config.js` 存在，
+  v8 通过 `eslintrc.cjs` 加载（有 deprecation 警告但能跑）
+- 若项目同时有 `.eslintrc.json`，v8 会优先用 legacy 配置
+- finding 数量可能与默认 v9 不同（规则集差异）
+
+> ⚠️ **跨 major 版本覆盖**是高级用法。建议仅在团队本地 lockfile 也锁在该 major
+> 时使用，否则容易引起更多歧义。
+
+#### 2.15.c 触发方式 C — 不填（默认行为，确认未触发覆盖逻辑）
+
+```yaml
+with:
+  # tsc_version / eslint_version / biome_version / prettier_version 都不写
+  enable_lint_tools: true
+```
+
+**预期**:
+
+- 日志中 `tool_version_overrides: {}`（空 map）
+- 装的版本就是 ai-reviewer 默认 pin 的（ESLint 9.15+ / Biome 2.3+ / TS 5.6+ / Prettier 3.0+）
+- 这是 99% 项目应有的状态 — 用户不主动覆盖，行为不变
+
+**通过条件**:
+
+- A 案：摘要表 TypeScript 行版本号确实是 5.4.x
+- B 案：摘要表 ESLint 行版本号确实是 8.x.x
+- C 案：摘要表显示默认版本（5.6.x / 9.15+ 等）
+- 三种触发方式下其他工具都正常工作，不互相影响
+
+#### 2.15.d 单元测试入口（无需触发 PR）
+
+`__tests__/lint-orchestrator.test.ts` 中新增了 3 个用例验证版本覆盖的内部
+透传机制：
+
+```bash
+cd ../ai-reviewer
+npm test -- __tests__/lint-orchestrator.test.ts \
+  -t "toolVersionOverrides"
+```
+
+预期：3 个用例全部通过（透传 / 部分覆盖 / 不覆盖三种路径）。
+
+---
+
 ## 3. 测试执行顺序建议
 
 | 步骤 | 场景 | 备注 |
@@ -465,8 +557,9 @@ push 触发 review。
 | 4 | I | 在主 PR 上追加只改注释的 commit |
 | 5 | J | 删除 `eslint.config.js` 触发新 review |
 | 6 | **N** | 在 workflow.yml 的 `with:` 加 `enable_prettier: true` 开启 Prettier（可选） |
-| 7 | H | 改 workflow 输入参数 |
-| 8 | G | （可选，破坏性较强）改 npm registry |
+| 7 | **O.a** | 在 workflow.yml 的 `with:` 加 `tsc_version: '~5.4.0'` 验证版本覆盖 |
+| 8 | H | 改 workflow 输入参数 |
+| 9 | G | （可选，破坏性较强）改 npm registry |
 
 ---
 
@@ -528,3 +621,4 @@ ai-reviewer 全部测试 230 个用例均通过。
 | ✅ 变更行过滤 | 场景 I 通过 |
 | ✅ TypeScript 类型错误覆盖 | 场景 M 通过：tsc 抓到 Bug 8/9 的 TS2339/TS2345，与 ESLint/Biome 不重复，统计表 Errors 列以 `X / Y` 区分变更行评论数与项目总数 |
 | ✅ Prettier 可按需启用 | 场景 N 通过：workflow.yml 写 `with: enable_prettier: true` 后统计表新增 Prettier 行 |
+| ✅ 工具版本可覆盖（避免双侧错配） | 场景 O 通过：`<tool>_version: '^x.y.z'` 让 ai-reviewer 装到与本地一致的版本；`lint-orchestrator.test.ts` 中 3 个 toolVersionOverrides 单元用例通过 |
