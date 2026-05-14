@@ -107,6 +107,34 @@ bash test_cases/iteration3-linter-sast/code-changes/apply-changes.sh
 
 **`package.json` 不会被修改，`node_modules` 也不会动。**
 
+#### 1.2.1 补充：专攻 ESLint + Biome 的 fresh-file 测试
+
+如果统计表里看到 `ESLint 0/X` / `Biome 0/X`（项目有问题但 0 进评论），
+通常是因为旧 fixture 文件 (`lint-test-cart.ts`) 在 `feature/lint` 上经过
+多次 commit，bug 行已经不在最新一次 commit 的变更行 ± 3 窗口内。
+
+跑下面的脚本会**从 main 派生新分支**，新增一个所有 bug 都在新增行的
+fixture (`utils/lint-test-eslint-biome.ts`)，验证 ESLint/Biome 发现确实
+能进入 PR 评论：
+
+```bash
+cd ai-reviewer-test
+bash docs/run-iter3-lint-eslint-biome.sh
+# 或仅本地提交不推送：NO_PUSH=1 bash docs/run-iter3-lint-eslint-biome.sh
+```
+
+脚本只负责"建分支 + 写文件 + commit + push"，**PR 请手动在 GitHub Web UI 创建**（base=main, head=feature/lint-eslint-biome-cases）。
+
+期望 PR 评论中能看到：
+
+| 工具 | Errors（X / Y）| 进入评论的规则 |
+|:----|:--------------|:--------------|
+| ESLint | ≥ 6 | array-callback-return ×2, no-unused-vars, eqeqeq ×2, no-console |
+| Biome  | ≥ 8 | useIterableCallbackReturn ×2, noUnusedVariables, noDoubleEquals ×2, noVar, useTemplate, useConst, noConsole |
+
+跨工具去重：Bug 3 / Bug 8 同时被两侧报，应合并成 1 条评论（`🧰 Tools` 卡片
+同时列出两侧 ruleId）。
+
 ### 1.3 验证待审查项目"什么都没装"
 
 ```bash
