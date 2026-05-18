@@ -23,7 +23,7 @@ export function normalizeSlug(raw: string): string {
   return raw
     .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/[^a-z0-2]+/g, "-")
     .replace(/^-+|-+$/g, "")
 }
 
