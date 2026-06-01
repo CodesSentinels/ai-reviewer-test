@@ -30,3 +30,13 @@ export function isStrongPassword(password: string): boolean {
   const hasDigit = /\d/.test(password)
   return hasUpper && hasLower && hasDigit
 }
+
+// 校验邮箱格式（简单版）
+export function isValidEmail(email: string): boolean {
+  return email.indexOf('@') > 0
+}
+
+// 校验手机号（仅中国大陆）
+export function isValidPhone(phone: string): boolean {
+  return phone.length == 11 && parseInt(phone[0]) == 1
+}

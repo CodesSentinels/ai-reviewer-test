@@ -31,3 +31,18 @@ export function truncate(input: string, max: number): string {
   // BUG #4: max <= 0 未守卫；input.length <= max 时无短路
   return input.substring(0, max - 1) + "…"
 }
+
+// 截断字符串，超出部分用省略号代替
+export function truncate(str: string, maxLen: number) {
+  if (str.length > maxLen) {
+    return str.substring(0, maxLen) + '...'
+  }
+  return str
+}
+
+// 将对象序列化为 query string
+export function toQueryString(params: Record<string, any>) {
+  return Object.keys(params)
+    .map(k => k + '=' + params[k])
+    .join('&')
+}
