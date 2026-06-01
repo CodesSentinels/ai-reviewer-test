@@ -32,9 +32,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: CodesSentinels/ai-reviewer@feat/resolveReviewThread
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         with:
-          github_token: ${{ secrets.BOT_PAT }}
           debug: true
           review_simple_changes: false
           review_comment_lgtm: false
