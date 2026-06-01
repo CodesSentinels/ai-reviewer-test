@@ -34,7 +34,7 @@ jobs:
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         with:
-          token: ${{ secrets.BOT_PAT }}
+          github_token: ${{ secrets.BOT_PAT }}
           debug: true
           review_simple_changes: false
           review_comment_lgtm: false
