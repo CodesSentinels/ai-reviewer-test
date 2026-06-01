@@ -30,11 +30,11 @@ jobs:
         with:
           node-version: "20"
       - uses: actions/checkout@v4
-      - uses: CodesSentinels/ai-reviewer@feature/lint
+      - uses: CodesSentinels/ai-reviewer@feat/resolveReviewThread
         env:
-          GITHUB_TOKEN: ${{ secrets.BOT_PAT }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         with:
+          token: ${{ secrets.BOT_PAT }}
           debug: true
           review_simple_changes: false
           review_comment_lgtm: false
