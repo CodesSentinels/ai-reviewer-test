@@ -71,11 +71,18 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         with:
+          resolve_token: ${{ secrets.BOT_PAT }}
           debug: true
           review_simple_changes: false
           review_comment_lgtm: false
           openai_heavy_model: gpt-4.1
 ```
+
+> **⚠️ `resolve` 命令必须配置 `BOT_PAT` Secret**
+>
+> GitHub API 的 `resolveReviewThread` mutation **不允许** `GITHUB_TOKEN`（integration token）调用，必须使用用户 PAT。
+> 在仓库 Settings → Secrets → Actions 中添加 `BOT_PAT`，值为有 `repo` scope 的用户 PAT。
+> 详见 [`member-b-resolve-design.md` §9 生产踩坑记录](../../ai-reviewer/docs/tasks/member-b-resolve-design.md#9-生产踩坑记录2026-06-02)。
 
 **相比现有文件的变化**：
 
@@ -86,6 +93,7 @@ jobs:
 | `concurrency.group` | 不含 `issue_comment` | 加入 `issue_comment` 独立 group |
 | `jobs.review.if` | 无 | 过滤非 PR 的 issue_comment |
 | Action 分支 | `@feature/vue` | `@feature/cmd` |
+| `with.resolve_token` | 无 | `${{ secrets.BOT_PAT }}`（resolve 命令必需）|
 
 #### 操作命令
 
@@ -669,35 +677,58 @@ command dispatcher: skip duplicate commentId=... cmd=help
 
 ---
 
-### 场景 10：ACK → 最终结果时序
+### 场景 10：resolve 命令 — 批量关闭 Bot 审查意见
 
-**目的**：验证 `needsAck=true` 的命令先产生 ⏳ 占位消息，然后编辑为最终结果。
+**目的**：验证 `@ai-reviewer resolve` 能将当前 PR 中所有 Bot 发出的未解决 review thread 批量标记为 Resolved，并验证 ACK → 最终结果时序。
+
+> **前置条件**：`BOT_PAT` secret 已配置，workflow 中已传入 `resolve_token`（见 §1.1）。  
+> 未配置 PAT 时命令会执行但始终失败，见 §10.1 降级行为说明。
 
 | 项 | 值 |
 | :--- | :--- |
 | 评论内容 | `@ai-reviewer resolve` |
+| 在哪里贴 | PR 任意 review thread 的回复框，或 PR 主评论区 |
 
-**观察方法**：发出评论后，**持续刷新 PR 页面**（或使用浏览器 DevTools Network 监控 API 调用）。
+**观察方法**：发出评论后，**持续刷新 PR 页面**（或使用浏览器 DevTools Network 监控）。
 
 **期望时序**：
 
-1. **先看到**（约 3~8 秒内）：
+1. **先看到**（约 3~5 秒内）：
    ```
    🤖 AI Reviewer · `resolve`
 
    ⏳ 正在执行 `resolve` …
    ```
 
-2. **随后同一条评论更新为**：
+2. **随后同一条评论更新为**（有待解决 thread 时）：
    ```
    🤖 AI Reviewer · `resolve`
 
-   🚧 **命令暂未实现**。...
+   ✅ 已解决 **N** 条 CodeSentinel 审查意见
    ```
+
+3. **PR 页面上**：之前展开的 review thread 折叠并显示 "Resolved"，resolvedBy 字段为触发命令的用户。
 
 **验证点**：
 - [ ] 是**同一条评论被编辑**（评论 ID 不变），而非新增第二条
 - [ ] ACK 消息在结果消息之前可见（哪怕只有几秒）
+- [ ] PR review thread 的 `isResolved` 变为 `true`（可通过 GraphQL API 确认）
+- [ ] 再次发送 `@ai-reviewer resolve` → Bot 回复 `ℹ️ 没有找到待解决的 CodeSentinel 审查意见`（幂等）
+
+#### 10.1 降级行为（未配置 PAT 时）
+
+如果 `resolve_token` 未传或为空：
+
+```
+🤖 AI Reviewer · `resolve`
+
+❌ 解决失败（共 **N** 条）
+
+错误详情：`Request failed due to following response errors:
+ - Resource not accessible by integration`
+```
+
+这是预期的降级行为，不代表命令框架有问题——是 GitHub API 对 integration token 的限制。
 
 ---
 
