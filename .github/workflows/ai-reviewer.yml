@@ -26,23 +26,28 @@ jobs:
       github.event_name != 'issue_comment' ||
       github.event.issue.pull_request != null
     steps:
+      # 生成 GitHub App installation token
+      - uses: actions/create-github-app-token@v1
+        id: bot-token
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
       - uses: actions/checkout@v4
       - uses: CodesSentinels/ai-reviewer@feature/lint
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ steps.bot-token.outputs.token }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         with:
-          resolve_token: ${{ secrets.BOT_PAT }}
           debug: true
           review_simple_changes: false
           review_comment_lgtm: false
           openai_heavy_model: gpt-5.4-mini
-          enable_shell: false
-          enable_web_search: false
-          enable_dependency_analysis: false
+          enable_shell: true
+          enable_web_search: true
+          enable_dependency_analysis: true
           path_filters: |
             **/*.ts
             **/*.vue
