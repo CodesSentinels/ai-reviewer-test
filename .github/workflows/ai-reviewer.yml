@@ -30,7 +30,7 @@ jobs:
         with:
           node-version: "20"
       - uses: actions/checkout@v4
-      - uses: CodesSentinels/ai-reviewer@feature/lint
+      - uses: CodesSentinels/ai-reviewer@feature/lint-semgrep
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -52,3 +52,4 @@ jobs:
             !dist/**
             !.output/**
           enable_lint_tools: true
+          tsc_version: "~5.4.0"
