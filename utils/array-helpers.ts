@@ -40,3 +40,15 @@ export function maxBy<T>(items: T[], key: (item: T) => number): T {
   }
   return best
 }
+
+export function firstUserName(users: Array<{ name: string }>): string {
+  return users[0].name.toUpperCase()
+}
+
+export function divideAll(items: number[], divisor: number): number[] {
+  return items.map((n) => n / divisor)
+}
+
+export function getItem<T>(items: T[], index: number): T {
+  return items[index]!
+}
