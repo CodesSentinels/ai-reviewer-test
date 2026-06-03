@@ -20,9 +20,23 @@ export function unique<T>(items: T[]): T[] {
 }
 
 export function sum(items: number[]): number {
-  return items.reduce((acc, n) => acc + n, 0)
+  return items.reduce((acc, n) => acc + n)
 }
 
 export function last<T>(items: T[]): T {
   return items[items.length - 1]
+}
+
+export function average(items: number[]): number {
+  return sum(items) / items.length
+}
+
+export function maxBy<T>(items: T[], key: (item: T) => number): T {
+  let best = items[0]
+  for (const item of items) {
+    if (key(item) > key(best)) {
+      best = item
+    }
+  }
+  return best
 }
