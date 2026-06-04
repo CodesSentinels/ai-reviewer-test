@@ -42,7 +42,7 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         with:
           bot_github_login: 'codesentinel-review-bot[bot]'
-          resolve_token: ${{ secrets.BOT_PAT }}
+          # resolve_token: ${{ secrets.BOT_PAT }}
           debug: true
           review_simple_changes: false
           review_comment_lgtm: false
