@@ -55,14 +55,20 @@ permissions:
 
 ---
 
-## 2. 第一步：创建代码变更 PR
+## 2. 第一步：生成代码并创建 PR
 
 ```bash
 cd ai-reviewer-test
+# 脚本仅生成代码（写入 utils/share-link.ts），不创建 PR
 bash test_cases/iteration2-member-d/code-changes/apply-changes.sh
-```
 
-该脚本会：创建分支 `test/iter2-member-d` → 新建 `utils/share-link.ts` → 提交、推送、建 PR，并打印 PR 编号。
+# 由你手动建分支、提交、推送、创建 PR
+git checkout -b test/iter2-member-d
+git add utils/share-link.ts
+git commit -m "test: iter2 member-d share-link utils"
+git push -u origin test/iter2-member-d
+gh pr create   # 或在网页创建 PR
+```
 
 `share-link.ts` 故意包含以下问题（合法 TS，可编译运行），用于产出多条审查评论：
 
