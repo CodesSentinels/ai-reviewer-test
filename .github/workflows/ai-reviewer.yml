@@ -14,7 +14,16 @@ on:
     types: [created]
 
 concurrency:
-  group: ${{ github.repository }}-${{ github.event.number || github.head_ref || github.sha }}-${{ github.workflow }}-${{ github.event_name == 'pull_request_review_comment' && 'pr_comment' || 'pr' }}
+  # Bot-triggered events (e.g. the ACK comment from resolve) get a unique group
+  # per run so they never cancel the human-triggered resolve run.
+  group: >-
+    ${{ github.event.sender.type == 'Bot'
+        && format('bot-noop-{0}', github.run_id)
+        || format('{0}-{1}-{2}-{3}',
+             github.repository,
+             github.event.number || github.head_ref || github.sha,
+             github.workflow,
+             github.event_name == 'pull_request_review_comment' && 'pr_comment' || 'pr') }}
   cancel-in-progress: ${{ github.event_name != 'pull_request_review_comment' }}
 
 jobs:
