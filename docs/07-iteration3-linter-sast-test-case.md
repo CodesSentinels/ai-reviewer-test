@@ -11,7 +11,7 @@
 > **本测试覆盖**:
 > - **零侧装依赖**：`package.json` 不变、`node_modules` 不必有 eslint/biome
 > - ESLint + Biome 集成（ai-reviewer 自动从 npm 装到 `/tmp` 沙箱）
-> - 变更行过滤、`.codesentinel.yaml` 配置（可选）
+> - 变更行过滤、Action 输入 per-tool 开关（消费方零配置文件）
 > - Prompt 注入、评论标注（🧰 Tools）、PR 摘要中的工具统计表
 > - 容错（npm 不可达/install 失败时不阻塞审查）
 
@@ -24,7 +24,7 @@
 | 项目 `package.json` | 必须加 `eslint@^9` + `@biomejs/biome@^2` | **不动** |
 | Workflow `npm install` 步骤 | 必须 | **不需要** |
 | `actions/checkout` | 必须 | 必须 |
-| `biome.json` / `.codesentinel.yaml` | 推荐 | 全部**可选** |
+| `biome.json` / `.codesentinel.yaml` | 推荐 | **全部已不再支持**：开关全部通过 Action 输入 `enable_eslint` / `enable_biome` / `enable_tsc` / `enable_prettier` 控制 |
 | 冷启动开销 | ~5s（`npm install`） | ~15s（首次安装到 `/tmp` 沙箱，后续 job 通过 GitHub Actions cache 可加速） |
 
 测试方法：
