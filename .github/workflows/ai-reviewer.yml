@@ -36,12 +36,12 @@ jobs:
         with:
           node-version: "20"
       - uses: actions/checkout@v4
-      - uses: CodesSentinels/ai-reviewer@feature/conversation
+      - uses: CodesSentinels/ai-reviewer@feature/lint-eslint-biome-cases
         env:
           GITHUB_TOKEN: ${{ steps.bot-token.outputs.token }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         with:
-          bot_github_login: 'codesentinel-review-bot[bot]'
+          bot_github_login: "codesentinel-review-bot[bot]"
           # resolve_token: ${{ secrets.BOT_PAT }}
           debug: true
           review_simple_changes: false
