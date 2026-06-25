@@ -36,7 +36,7 @@ jobs:
         with:
           node-version: "20"
       - uses: actions/checkout@v4
-      - uses: CodesSentinels/ai-reviewer@feature/state-persistence
+      - uses: CodesSentinels/ai-reviewer@feature/conversation
         env:
           GITHUB_TOKEN: ${{ steps.bot-token.outputs.token }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
