@@ -6,6 +6,9 @@ permissions:
   issues: write
 
 on:
+  push:
+    branches:
+      - test/dev4
   pull_request:
     types: [opened, synchronize, reopened]
   pull_request_review_comment:
