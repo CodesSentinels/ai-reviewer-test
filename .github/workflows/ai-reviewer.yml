@@ -8,6 +8,7 @@ permissions:
 on:
   push:
     branches:
+      - main
       - 'test/dev*'
   pull_request:
     types: [opened, synchronize, reopened]
@@ -47,12 +48,11 @@ jobs:
         with:
           node-version: "20"
       - uses: actions/checkout@v4
-      # 动态解析 ai-reviewer 分支：PR 取 base_ref，push 取 ref_name，main 回退到 feature/conversation
+      # 动态解析 ai-reviewer 分支：PR 取 base_ref，push 取 ref_name
       - name: Resolve ai-reviewer branch
         id: ref
         run: |
           BRANCH="${{ github.base_ref || github.ref_name }}"
-          [ "$BRANCH" = "main" ] && BRANCH="feature/conversation"
           echo "branch=$BRANCH" >> $GITHUB_OUTPUT
       - uses: actions/checkout@v4
         with:
