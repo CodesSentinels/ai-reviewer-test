@@ -8,7 +8,7 @@ permissions:
 on:
   push:
     branches:
-      - test/dev4
+      - 'test/dev*'
   pull_request:
     types: [opened, synchronize, reopened]
   pull_request_review_comment:
@@ -47,7 +47,20 @@ jobs:
         with:
           node-version: "20"
       - uses: actions/checkout@v4
-      - uses: CodesSentinels/ai-reviewer@test/dev4
+      # 动态解析 ai-reviewer 分支：PR 取 base_ref，push 取 ref_name，main 回退到 feature/conversation
+      - name: Resolve ai-reviewer branch
+        id: ref
+        run: |
+          BRANCH="${{ github.base_ref || github.ref_name }}"
+          [ "$BRANCH" = "main" ] && BRANCH="feature/conversation"
+          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+      - uses: actions/checkout@v4
+        with:
+          repository: CodesSentinels/ai-reviewer
+          ref: ${{ steps.ref.outputs.branch }}
+          path: .github/ai-reviewer-action
+          token: ${{ steps.bot-token.outputs.token }}
+      - uses: ./.github/ai-reviewer-action
         env:
           GITHUB_TOKEN: ${{ steps.bot-token.outputs.token }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
