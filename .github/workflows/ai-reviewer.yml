@@ -6,10 +6,6 @@ permissions:
   issues: write
 
 on:
-  push:
-    branches:
-      - main
-      - "test/dev*"
   pull_request:
     types: [opened, synchronize, reopened]
   pull_request_review_comment:
