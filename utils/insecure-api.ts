@@ -1,5 +1,5 @@
 // utils/insecure-api.ts
-// generated: 2026-06-30 16:17:57
+// generated: 2026-06-30 16:21:06
 import { createServer } from 'http'
 
 /**
@@ -9,7 +9,7 @@ import { createServer } from 'http'
 export function handleRequest(req: any, res: any) {
   // 安全问题 1: SQL 注入
   const userId = req.query.id
-  const query = 
+  const query = `SELECT * FROM users WHERE id = '${userId}'`
 
   // 安全问题 2: 未验证的 eval
   const code = req.body.expression
