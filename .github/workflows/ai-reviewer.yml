@@ -49,10 +49,17 @@ jobs:
           node-version: "20"
       - uses: actions/checkout@v4
       # 动态解析 ai-reviewer 分支：PR 取 base_ref，push 取 ref_name
+      # 若目标分支在 ai-reviewer 仓库不存在则 fallback 到 main
       - name: Resolve ai-reviewer branch
         id: ref
+        env:
+          GH_TOKEN: ${{ steps.bot-token.outputs.token }}
         run: |
           BRANCH="${{ github.base_ref || github.ref_name }}"
+          if ! git ls-remote --exit-code --heads "https://x-access-token:${GH_TOKEN}@github.com/CodesSentinels/ai-reviewer.git" "$BRANCH" >/dev/null 2>&1; then
+            echo "⚠️  Branch '$BRANCH' not found in ai-reviewer, falling back to main"
+            BRANCH="main"
+          fi
           echo "branch=$BRANCH" >> $GITHUB_OUTPUT
       - uses: actions/checkout@v4
         with:
