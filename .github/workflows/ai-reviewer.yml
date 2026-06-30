@@ -48,6 +48,12 @@ jobs:
         with:
           node-version: "20"
       - uses: actions/checkout@v4
+      - name: Debug - Print all environment variables
+        env:
+          GITHUB_TOKEN: ${{ steps.bot-token.outputs.token }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: env | sort
+
       # 指定 ai-reviewer 分支（测试完成后改回动态解析或 main）
       - uses: actions/checkout@v4
         with:
