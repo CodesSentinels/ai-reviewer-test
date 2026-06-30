@@ -1,33 +1,31 @@
 #!/bin/bash
 # ============================================================================
-# AI Reviewer 测试项目生成脚本 - 测试人 2（命令系统与状态管理）
+# AI Reviewer 测试项目 - 基线生成脚本（干净正确的代码）
 # ============================================================================
-# 目标：生成一个完整的 Nuxt.js 项目，包含有意的代码问题，用于测试：
-#   2.1 命令解析与路由 - @codesentinel help/review/resolve 等命令
-#   2.2 权限与限流 - 用户权限校验、速率限制
-#   2.3 resolve 命令 - Bot 产出评论后批量解决
-#   2.4 审查控制命令 - review/full review/pause/resume/summary/configuration
-#   2.5 ACK 与反馈机制 - 表情确认、进度回帖
+# 目标：生成一个完整的 Nuxt.js 项目作为 main 分支基线。
+# 代码实现正确、无安全漏洞，作为后续 generate-issues.sh 的对比基础。
 #
 # 使用方式：
-#   chmod +x generate-test-project.sh
-#   ./generate-test-project.sh
-#   然后手动提交 PR 进行测试
+#   git checkout main
+#   chmod +x docs/generate-base.sh
+#   ./docs/generate-base.sh
+#   git add -A && git commit -m "feat: add nuxt.js test project baseline"
+#   git push origin main
 # ============================================================================
 
 set -e
 
-PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$PROJECT_DIR"
 
-echo "🚀 开始生成 Nuxt.js 测试项目..."
+echo "🚀 开始生成 Nuxt.js 基线项目（正确实现）..."
 echo "📁 项目目录: $PROJECT_DIR"
 
 # ============================================================================
-# 基础层 (base-layer) - 使用 Nuxt extends 实现项目继承
+# 基础层 (base-layer)
 # ============================================================================
 
-echo "📦 创建 base-layer (Nuxt extends)..."
+echo "📦 创建 base-layer..."
 
 mkdir -p base-layer/{components,composables,utils,plugins,middleware,layouts}
 
@@ -61,10 +59,9 @@ cat > base-layer/components/AppHeader.vue << 'EOF'
 <script setup lang="ts">
 const { user, logout } = useAuth()
 
-// 问题：logout 可能返回 Promise 但未 await
-const handleLogout = () => {
-  logout()
-  navigateTo('/login')
+const handleLogout = async () => {
+  await logout()
+  await navigateTo('/login')
 }
 </script>
 EOF
@@ -82,8 +79,7 @@ cat > base-layer/components/AppFooter.vue << 'EOF'
 </template>
 
 <script setup lang="ts">
-// 问题：每次渲染都创建新 Date 对象，不必要的响应式计算
-const currentYear = computed(() => new Date().getFullYear())
+const currentYear = new Date().getFullYear()
 </script>
 EOF
 
@@ -94,16 +90,18 @@ export const useTheme = () => {
 
   const toggleTheme = () => {
     theme.value = theme.value === 'light' ? 'dark' : 'light'
-    // 问题：直接操作 DOM，应该用响应式绑定
-    document.documentElement.setAttribute('data-theme', theme.value)
-    localStorage.setItem('theme', theme.value)
   }
 
   const initTheme = () => {
-    // 问题：SSR 环境下 localStorage 不可用
-    const saved = localStorage.getItem('theme') as 'light' | 'dark'
-    if (saved) {
-      theme.value = saved
+    if (import.meta.client) {
+      const saved = localStorage.getItem('theme') as 'light' | 'dark' | null
+      if (saved) {
+        theme.value = saved
+      }
+      watch(theme, (val) => {
+        document.documentElement.setAttribute('data-theme', val)
+        localStorage.setItem('theme', val)
+      }, { immediate: true })
     }
   }
 
@@ -115,7 +113,7 @@ EOF
 cat > base-layer/composables/useApi.ts << 'EOF'
 interface ApiOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE'
-  body?: any
+  body?: unknown
   headers?: Record<string, string>
 }
 
@@ -126,17 +124,20 @@ export const useApi = () => {
   const request = async <T>(endpoint: string, options: ApiOptions = {}): Promise<T> => {
     const { method = 'GET', body, headers = {} } = options
 
-    // 问题：没有错误处理，fetch 失败会导致未捕获异常
-    const response = await $fetch<T>(`${baseURL}${endpoint}`, {
-      method,
-      body,
-      headers: {
-        'Content-Type': 'application/json',
-        ...headers
-      }
-    })
-
-    return response
+    try {
+      const response = await $fetch<T>(`${baseURL}${endpoint}`, {
+        method,
+        body,
+        headers: {
+          'Content-Type': 'application/json',
+          ...headers
+        }
+      })
+      return response
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Request failed'
+      throw new Error(`API Error [${method} ${endpoint}]: ${message}`)
+    }
   }
 
   return { request }
@@ -147,61 +148,72 @@ EOF
 cat > base-layer/utils/logger.ts << 'EOF'
 type LogLevel = 'debug' | 'info' | 'warn' | 'error'
 
-// 问题：全局可变状态，可能导致并发问题
-let logHistory: Array<{ level: LogLevel; message: string; timestamp: number }> = []
+interface LogEntry {
+  level: LogLevel
+  message: string
+  timestamp: number
+}
 
-export const logger = {
-  debug(message: string) {
-    this._log('debug', message)
-  },
-  info(message: string) {
-    this._log('info', message)
-  },
-  warn(message: string) {
-    this._log('warn', message)
-  },
-  error(message: string) {
-    this._log('error', message)
-  },
-  _log(level: LogLevel, message: string) {
-    const entry = { level, message, timestamp: Date.now() }
-    logHistory.push(entry)
-    // 问题：生产环境不应该 console.log
-    console.log(`[${level.toUpperCase()}] ${message}`)
-  },
-  getHistory() {
-    return logHistory
-  },
-  clear() {
-    logHistory = []
+export const createLogger = (prefix: string = '') => {
+  const history: LogEntry[] = []
+
+  const log = (level: LogLevel, message: string) => {
+    const entry: LogEntry = { level, message, timestamp: Date.now() }
+    history.push(entry)
+
+    if (import.meta.dev) {
+      const tag = prefix ? `[${prefix}]` : ''
+      console[level](`${tag}[${level.toUpperCase()}] ${message}`)
+    }
+  }
+
+  return {
+    debug: (msg: string) => log('debug', msg),
+    info: (msg: string) => log('info', msg),
+    warn: (msg: string) => log('warn', msg),
+    error: (msg: string) => log('error', msg),
+    getHistory: () => [...history],
+    clear: () => { history.length = 0 }
   }
 }
+
+export const logger = createLogger()
 EOF
 
 # --- base-layer/utils/validators.ts ---
 cat > base-layer/utils/validators.ts << 'EOF'
 export const validators = {
-  // 问题：邮箱验证正则过于简单，不符合 RFC 5322
   isEmail(value: string): boolean {
-    return /\S+@\S+\.\S+/.test(value)
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
   },
 
   isPhone(value: string): boolean {
     return /^1[3-9]\d{9}$/.test(value)
   },
 
-  // 问题：密码只检查长度，没有复杂度要求
   isStrongPassword(value: string): boolean {
-    return value.length >= 6
+    if (value.length < 8) return false
+    const hasUpper = /[A-Z]/.test(value)
+    const hasLower = /[a-z]/.test(value)
+    const hasDigit = /\d/.test(value)
+    const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(value)
+    return hasUpper && hasLower && hasDigit && hasSpecial
   },
 
-  // 问题：没有 XSS 防护
   sanitizeInput(value: string): string {
-    return value.trim()
+    return value
+      .trim()
+      .replace(/[<>&"']/g, (char) => {
+        const entities: Record<string, string> = {
+          '<': '&lt;', '>': '&gt;', '&': '&amp;',
+          '"': '&quot;', "'": '&#x27;'
+        }
+        return entities[char] || char
+      })
   },
 
   isValidPrice(value: number): boolean {
-    return value > 0 && Number.isFinite(value)
+    return value > 0 && Number.isFinite(value) && Number.isInteger(value * 100)
   }
 }
 EOF
@@ -221,14 +233,17 @@ EOF
 # --- base-layer/plugins/error-handler.ts ---
 cat > base-layer/plugins/error-handler.ts << 'EOF'
 export default defineNuxtPlugin((nuxtApp) => {
-  nuxtApp.vueApp.config.errorHandler = (error, _instance, _info) => {
-    // 问题：错误处理过于简单，生产环境应上报到监控系统
-    console.error('Global error:', error)
+  nuxtApp.vueApp.config.errorHandler = (error, instance, info) => {
+    if (import.meta.dev) {
+      console.error('Global error:', error, '\nComponent:', instance, '\nInfo:', info)
+    }
+    // Production: send to monitoring service
   }
 
-  nuxtApp.hook('vue:error', (error) => {
-    // 问题：吞掉了错误，没有任何处理
-    console.error('Vue error:', error)
+  nuxtApp.hook('vue:error', (error, instance, info) => {
+    if (import.meta.dev) {
+      console.error('Vue error:', error, '\nComponent:', instance, '\nInfo:', info)
+    }
   })
 })
 EOF
@@ -264,9 +279,9 @@ EOF
 
 echo "📦 创建主项目结构..."
 
-mkdir -p {components,components/ui,composables,layouts,middleware,pages,pages/products,plugins,server/api,stores,utils,types,assets/css}
+mkdir -p {components,components/ui,composables,layouts,middleware,pages,pages/products,plugins,server/api,server/api/auth,server/api/products,stores,utils,types,assets/css}
 
-# --- nuxt.config.ts (主项目，extends base-layer) ---
+# --- nuxt.config.ts ---
 cat > nuxt.config.ts << 'EOF'
 export default defineNuxtConfig({
   extends: ['./base-layer'],
@@ -274,12 +289,11 @@ export default defineNuxtConfig({
   modules: ['@pinia/nuxt', '@vueuse/nuxt'],
 
   runtimeConfig: {
-    // 问题：敏感信息不应有默认值
-    supabaseServiceKey: 'default-service-key',
+    supabaseServiceKey: '',
     public: {
-      apiBase: 'https://api.example.com',
-      supabaseUrl: 'https://xxx.supabase.co',
-      supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.placeholder'
+      apiBase: '',
+      supabaseUrl: '',
+      supabaseAnonKey: ''
     }
   },
 
@@ -405,8 +419,41 @@ export interface ApiResponse<T> {
 }
 EOF
 
+# --- types/constants.ts ---
+cat > types/constants.ts << 'EOF'
+export const APP_NAME = 'AI Reviewer Test Store'
+export const APP_VERSION = '1.0.0'
+export const DEFAULT_PAGE_SIZE = 20
+export const MAX_CART_ITEMS = 99
+export const SUPPORTED_LANGUAGES = ['zh-CN', 'en-US', 'ja-JP']
+export const ORDER_STATUS = ['pending', 'paid', 'shipped', 'completed'] as const
+EOF
+
+# --- types/enums.ts ---
+cat > types/enums.ts << 'EOF'
+export enum UserRole {
+  Admin = 'admin',
+  User = 'user',
+  Guest = 'guest',
+}
+
+export enum OrderStatus {
+  Pending = 'pending',
+  Paid = 'paid',
+  Shipped = 'shipped',
+  Completed = 'completed',
+}
+
+export enum ProductCategory {
+  Books = 'books',
+  Electronics = 'electronics',
+  Clothing = 'clothing',
+  Food = 'food',
+}
+EOF
+
 # ============================================================================
-# Composables（主项目）
+# Composables
 # ============================================================================
 
 echo "📦 创建 composables..."
@@ -417,26 +464,20 @@ import type { User } from '~/types'
 
 export const useAuth = () => {
   const user = useState<User | null>('auth-user', () => null)
-  const token = useState<string | null>('auth-token', () => null)
+  const token = useCookie('auth_token', { httpOnly: false, secure: true, sameSite: 'strict' })
   const loading = useState('auth-loading', () => false)
 
   const login = async (email: string, password: string) => {
     loading.value = true
     try {
-      // 问题：密码明文传输，未做加密处理
       const response = await $fetch<{ user: User; token: string }>('/api/auth/login', {
         method: 'POST',
         body: { email, password }
       })
       user.value = response.user
       token.value = response.token
-      // 问题：token 存储在 localStorage 有 XSS 风险
-      if (import.meta.client) {
-        localStorage.setItem('auth_token', response.token)
-      }
-    } catch (error: any) {
-      // 问题：将服务端错误信息直接暴露给用户
-      throw new Error(error.data?.message || error.message)
+    } catch (error: unknown) {
+      throw new Error('登录失败，请检查邮箱和密码')
     } finally {
       loading.value = false
     }
@@ -445,14 +486,13 @@ export const useAuth = () => {
   const logout = async () => {
     user.value = null
     token.value = null
-    if (import.meta.client) {
-      localStorage.removeItem('auth_token')
-    }
     await navigateTo('/login')
   }
 
   const register = async (data: { email: string; password: string; name: string }) => {
-    // 问题：没有前端输入验证
+    if (!data.email || !data.password || !data.name) {
+      throw new Error('请填写所有必填字段')
+    }
     const response = await $fetch<{ user: User; token: string }>('/api/auth/register', {
       method: 'POST',
       body: data
@@ -468,21 +508,26 @@ EOF
 # --- composables/useCart.ts ---
 cat > composables/useCart.ts << 'EOF'
 import type { CartItem, Product } from '~/types'
+import { MAX_CART_ITEMS } from '~/types/constants'
 
 export const useCart = () => {
   const items = useState<CartItem[]>('cart-items', () => [])
 
   const addToCart = (product: Product, quantity: number = 1) => {
+    if (product.stock <= 0) return
+    if (quantity <= 0) return
+
     const existing = items.value.find(item => item.product.id === product.id)
     if (existing) {
-      // 问题：没有检查库存是否充足
-      existing.quantity += quantity
+      const newQty = existing.quantity + quantity
+      if (newQty > product.stock) {
+        existing.quantity = product.stock
+      } else {
+        existing.quantity = newQty
+      }
     } else {
-      items.value.push({ product, quantity })
-    }
-    // 问题：直接修改 DOM，应该用 toast 组件
-    if (import.meta.client) {
-      document.title = `(${totalItems.value}) 购物车`
+      if (items.value.length >= MAX_CART_ITEMS) return
+      items.value.push({ product, quantity: Math.min(quantity, product.stock) })
     }
   }
 
@@ -491,10 +536,13 @@ export const useCart = () => {
   }
 
   const updateQuantity = (productId: string, quantity: number) => {
-    // 问题：quantity 可能为负数或零
+    if (quantity <= 0) {
+      removeFromCart(productId)
+      return
+    }
     const item = items.value.find(item => item.product.id === productId)
     if (item) {
-      item.quantity = quantity
+      item.quantity = Math.min(quantity, item.product.stock)
     }
   }
 
@@ -502,9 +550,10 @@ export const useCart = () => {
     items.value = []
   }
 
-  // 问题：浮点数精度问题
   const totalPrice = computed(() => {
-    return items.value.reduce((sum, item) => sum + item.product.price * item.quantity, 0)
+    return items.value.reduce((sum, item) => {
+      return sum + Math.round(item.product.price * 100) * item.quantity / 100
+    }, 0)
   })
 
   const totalItems = computed(() => {
@@ -524,27 +573,31 @@ interface FeatureFlags {
   maxCartItems: number
 }
 
+const DEFAULT_FLAGS: FeatureFlags = {
+  enableNewCheckout: false,
+  enableDarkMode: true,
+  enableWebSocket: false,
+  maxCartItems: 99
+}
+
 export const useFeatureFlag = () => {
-  // 问题：默认值硬编码，应该从服务端获取
-  const flags = useState<FeatureFlags>('feature-flags', () => ({
-    enableNewCheckout: false,
-    enableDarkMode: true,
-    enableWebSocket: false,
-    maxCartItems: 99
-  }))
+  const flags = useState<FeatureFlags>('feature-flags', () => ({ ...DEFAULT_FLAGS }))
+  const loaded = useState('feature-flags-loaded', () => false)
 
   const isEnabled = (flag: keyof FeatureFlags): boolean => {
-    // 问题：类型断言不安全
-    return flags.value[flag] as unknown as boolean
+    const value = flags.value[flag]
+    return typeof value === 'boolean' ? value : false
   }
 
   const fetchFlags = async () => {
+    if (loaded.value) return
     try {
       const response = await $fetch<FeatureFlags>('/api/feature-flags')
       flags.value = response
+      loaded.value = true
     } catch {
-      // 问题：静默失败，功能开关获取失败应该有降级策略
       console.warn('Failed to fetch feature flags, using defaults')
+      flags.value = { ...DEFAULT_FLAGS }
     }
   }
 
@@ -556,39 +609,47 @@ EOF
 cat > composables/useSupabase.ts << 'EOF'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
-let supabaseInstance: SupabaseClient | null = null
+const ALLOWED_FILE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
+const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 
 export const useSupabase = () => {
   const config = useRuntimeConfig()
+  const client = useState<SupabaseClient | null>('supabase-client', () => null)
 
-  // 问题：单例在 SSR 环境下会跨请求共享状态
-  if (!supabaseInstance) {
-    supabaseInstance = createClient(
+  if (!client.value) {
+    client.value = createClient(
       config.public.supabaseUrl as string,
       config.public.supabaseAnonKey as string
     )
   }
 
   const uploadFile = async (bucket: string, path: string, file: File) => {
-    // 问题：没有文件类型和大小验证
-    const { data, error } = await supabaseInstance!.storage
+    if (!ALLOWED_FILE_TYPES.includes(file.type)) {
+      throw new Error(`不支持的文件类型: ${file.type}`)
+    }
+    if (file.size > MAX_FILE_SIZE) {
+      throw new Error('文件大小不能超过 10MB')
+    }
+
+    const safePath = path.replace(/\.\./g, '').replace(/^\//, '')
+    const { data, error } = await client.value!.storage
       .from(bucket)
-      .upload(path, file)
+      .upload(safePath, file)
 
     if (error) throw error
     return data
   }
 
   const getPublicUrl = (bucket: string, path: string) => {
-    // 问题：路径拼接没有安全校验，可能存在路径遍历
-    const { data } = supabaseInstance!.storage
+    const safePath = path.replace(/\.\./g, '').replace(/^\//, '')
+    const { data } = client.value!.storage
       .from(bucket)
-      .getPublicUrl(path)
+      .getPublicUrl(safePath)
 
     return data.publicUrl
   }
 
-  return { client: supabaseInstance!, uploadFile, getPublicUrl }
+  return { client: client.value!, uploadFile, getPublicUrl }
 }
 EOF
 
@@ -612,9 +673,8 @@ cat > components/ui/BaseButton.vue << 'EOF'
 </template>
 
 <script setup lang="ts">
-// 问题：props 类型定义中 variant 没有限制合法值范围
 defineProps<{
-  variant?: string
+  variant?: 'primary' | 'secondary' | 'danger' | 'ghost'
   size?: 'sm' | 'md' | 'lg'
   loading?: boolean
   disabled?: boolean
@@ -670,12 +730,10 @@ const emit = defineEmits<{
   'update:modelValue': [value: string]
 }>()
 
-// 问题：每次渲染生成新 ID，导致 SSR hydration mismatch
-const inputId = `input-${Math.random().toString(36).slice(2)}`
+const inputId = useId()
 
 const handleInput = (event: Event) => {
   const target = event.target as HTMLInputElement
-  // 问题：没有对 type="number" 做数值转换
   emit('update:modelValue', target.value)
 }
 </script>
@@ -688,7 +746,7 @@ cat > components/ProductCard.vue << 'EOF'
     <img :src="product.imageUrl" :alt="product.name" class="product-image" />
     <div class="product-info">
       <h3>{{ product.name }}</h3>
-      <p class="price">¥{{ formatPrice(product.price) }}</p>
+      <p class="price">{{ formattedPrice }}</p>
       <p class="stock" :class="{ 'low-stock': product.stock < 5 }">
         库存: {{ product.stock }}
       </p>
@@ -701,6 +759,7 @@ cat > components/ProductCard.vue << 'EOF'
 
 <script setup lang="ts">
 import type { Product } from '~/types'
+import { formatPrice } from '~/utils/formatPrice'
 
 const props = defineProps<{
   product: Product
@@ -709,18 +768,16 @@ const props = defineProps<{
 const { addToCart } = useCart()
 const router = useRouter()
 
-// 问题：formatPrice 使用 toFixed 可能丢失精度
-const formatPrice = (price: number): string => {
-  return price.toFixed(2)
-}
+const formattedPrice = computed(() => formatPrice(props.product.price))
 
 const goToProduct = () => {
   router.push(`/products/${props.product.id}`)
 }
 
 const handleAddToCart = () => {
-  // 问题：没有检查库存是否 > 0
-  addToCart(props.product)
+  if (props.product.stock > 0) {
+    addToCart(props.product)
+  }
 }
 </script>
 
@@ -761,12 +818,12 @@ cat > components/CartSummary.vue << 'EOF'
     <h2>订单摘要</h2>
     <div class="summary-row" v-for="item in items" :key="item.product.id">
       <span>{{ item.product.name }} × {{ item.quantity }}</span>
-      <span>¥{{ (item.product.price * item.quantity).toFixed(2) }}</span>
+      <span>{{ formatPrice(item.product.price * item.quantity) }}</span>
     </div>
     <hr />
     <div class="summary-total">
       <strong>总计</strong>
-      <strong>¥{{ totalPrice.toFixed(2) }}</strong>
+      <strong>{{ formatPrice(totalPrice) }}</strong>
     </div>
     <BaseButton variant="primary" size="lg" :loading="submitting" @click="handleCheckout">
       提交订单
@@ -775,20 +832,21 @@ cat > components/CartSummary.vue << 'EOF'
 </template>
 
 <script setup lang="ts">
+import { formatPrice } from '~/utils/formatPrice'
+
 const { items, totalPrice, clearCart } = useCart()
 const { user } = useAuth()
 const submitting = ref(false)
 
 const handleCheckout = async () => {
-  // 问题：没有二次确认
   if (!user.value) {
     navigateTo('/login')
     return
   }
+  if (items.value.length === 0) return
 
   submitting.value = true
   try {
-    // 问题：没有幂等性保障，网络重试可能创建重复订单
     await $fetch('/api/orders', {
       method: 'POST',
       body: {
@@ -798,9 +856,9 @@ const handleCheckout = async () => {
     })
     clearCart()
     navigateTo('/orders/success')
-  } catch (error: any) {
-    // 问题：alert 不适合生产环境
-    alert('提交失败: ' + error.message)
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : '提交失败'
+    console.error('Checkout failed:', message)
   } finally {
     submitting.value = false
   }
@@ -833,14 +891,13 @@ cat > components/ReviewPanel.vue << 'EOF'
   <div class="review-panel">
     <h3>商品评价</h3>
     <div v-if="reviews.length === 0" class="no-reviews">暂无评价</div>
-    <div v-for="review in reviews" :key="review.id" class="review-item">
+    <div v-for="review in paginatedReviews" :key="review.id" class="review-item">
       <div class="review-header">
         <span class="reviewer">{{ review.userName }}</span>
         <span class="rating">{{ '⭐'.repeat(review.rating) }}</span>
         <span class="date">{{ formatDate(review.createdAt) }}</span>
       </div>
-      <!-- 问题：v-html 直接渲染用户输入，存在 XSS 漏洞 -->
-      <div class="review-content" v-html="review.content" />
+      <p class="review-content">{{ review.content }}</p>
     </div>
     <form @submit.prevent="submitReview" class="review-form">
       <textarea v-model="newReview" placeholder="写下你的评价..." rows="3" />
@@ -851,7 +908,7 @@ cat > components/ReviewPanel.vue << 'EOF'
         <option :value="4">4星</option>
         <option :value="5">5星</option>
       </select>
-      <BaseButton variant="primary" type="submit">提交评价</BaseButton>
+      <BaseButton variant="primary" type="submit" :disabled="submitting">提交评价</BaseButton>
     </form>
   </div>
 </template>
@@ -872,52 +929,47 @@ const props = defineProps<{
 const reviews = ref<Review[]>([])
 const newReview = ref('')
 const newRating = ref(5)
+const submitting = ref(false)
+const page = ref(1)
+const pageSize = 10
+
+const paginatedReviews = computed(() => {
+  return reviews.value.slice(0, page.value * pageSize)
+})
 
 const fetchReviews = async () => {
-  // 问题：没有分页，大量评价会导致性能问题
   reviews.value = await $fetch<Review[]>(`/api/products/${props.productId}/reviews`)
 }
 
-// 问题：日期格式化没有国际化支持
 const formatDate = (dateStr: string) => {
-  return new Date(dateStr).toLocaleDateString()
+  return new Intl.DateTimeFormat('zh-CN').format(new Date(dateStr))
 }
 
 const submitReview = async () => {
-  // 问题：没有防止重复提交
-  await $fetch(`/api/products/${props.productId}/reviews`, {
-    method: 'POST',
-    body: { content: newReview.value, rating: newRating.value }
-  })
-  newReview.value = ''
-  await fetchReviews()
+  if (submitting.value || !newReview.value.trim()) return
+  submitting.value = true
+  try {
+    await $fetch(`/api/products/${props.productId}/reviews`, {
+      method: 'POST',
+      body: { content: newReview.value, rating: newRating.value }
+    })
+    newReview.value = ''
+    await fetchReviews()
+  } finally {
+    submitting.value = false
+  }
 }
 
 onMounted(fetchReviews)
 </script>
 
 <style scoped>
-.review-panel {
-  margin-top: 2rem;
-}
-.review-item {
-  padding: 1rem 0;
-  border-bottom: 1px solid #e5e7eb;
-}
-.review-header {
-  display: flex;
-  gap: 1rem;
-  align-items: center;
-  margin-bottom: 0.5rem;
-}
+.review-panel { margin-top: 2rem; }
+.review-item { padding: 1rem 0; border-bottom: 1px solid #e5e7eb; }
+.review-header { display: flex; gap: 1rem; align-items: center; margin-bottom: 0.5rem; }
 .reviewer { font-weight: bold; }
 .date { color: #6b7280; font-size: 0.875rem; }
-.review-form {
-  margin-top: 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
+.review-form { margin-top: 1rem; display: flex; flex-direction: column; gap: 0.5rem; }
 </style>
 EOF
 
@@ -938,29 +990,19 @@ interface Stat {
   value: string | number
 }
 
-// 问题：轮询间隔过短，可能导致服务器压力过大
 const stats = ref<Stat[]>([])
-let pollTimer: ReturnType<typeof setInterval> | null = null
+const { pause, resume } = useIntervalFn(fetchStats, 30000)
 
-const fetchStats = async () => {
+async function fetchStats() {
   try {
     stats.value = await $fetch<Stat[]>('/api/dashboard/stats')
   } catch {
-    // 静默失败
+    // keep previous stats on failure
   }
 }
 
-onMounted(() => {
-  fetchStats()
-  // 问题：每 3 秒轮询一次太频繁，且未在组件销毁时清理
-  pollTimer = setInterval(fetchStats, 3000)
-})
-
-onUnmounted(() => {
-  if (pollTimer) {
-    clearInterval(pollTimer)
-  }
-})
+onMounted(fetchStats)
+onUnmounted(pause)
 </script>
 
 <style scoped>
@@ -978,15 +1020,8 @@ onUnmounted(() => {
   flex-direction: column;
   align-items: center;
 }
-.stat-value {
-  font-size: 2rem;
-  font-weight: bold;
-  color: #3b82f6;
-}
-.stat-label {
-  color: #6b7280;
-  margin-top: 0.5rem;
-}
+.stat-value { font-size: 2rem; font-weight: bold; color: #3b82f6; }
+.stat-label { color: #6b7280; margin-top: 0.5rem; }
 </style>
 EOF
 
@@ -999,7 +1034,7 @@ cat > components/NotificationBell.vue << 'EOF'
     <div v-if="showPanel" class="notification-panel">
       <div v-for="notif in notifications" :key="notif.id" class="notif-item"
            :class="{ unread: !notif.read }"
-           @click="markAsRead(notif.id)">
+           @click.stop="markAsRead(notif.id)">
         <p>{{ notif.message }}</p>
         <span class="notif-time">{{ notif.createdAt }}</span>
       </div>
@@ -1018,7 +1053,6 @@ interface Notification {
 const showPanel = ref(false)
 const notifications = ref<Notification[]>([])
 
-// 问题：每次重新计算都遍历整个数组
 const unreadCount = computed(() => notifications.value.filter(n => !n.read).length)
 
 const togglePanel = () => {
@@ -1026,68 +1060,59 @@ const togglePanel = () => {
 }
 
 const markAsRead = async (id: string) => {
-  // 问题：乐观更新没有回滚机制
-  const notif = notifications.value.find(n => n.id === id)
-  if (notif) notif.read = true
-
-  await $fetch(`/api/notifications/${id}/read`, { method: 'POST' })
+  try {
+    await $fetch(`/api/notifications/${id}/read`, { method: 'POST' })
+    const notif = notifications.value.find(n => n.id === id)
+    if (notif) notif.read = true
+  } catch {
+    // revert on failure — already unchanged since we update after success
+  }
 }
 
-// 问题：WebSocket 连接没有重连逻辑
 const connectWebSocket = () => {
-  if (import.meta.client) {
-    const ws = new WebSocket('wss://api.example.com/notifications')
+  if (!import.meta.client) return
+  const config = useRuntimeConfig()
+  const wsUrl = `${config.public.apiBase.replace('http', 'ws')}/notifications`
+  let ws: WebSocket | null = null
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+
+  const connect = () => {
+    ws = new WebSocket(wsUrl)
     ws.onmessage = (event) => {
       const notif = JSON.parse(event.data) as Notification
       notifications.value.unshift(notif)
     }
+    ws.onclose = () => {
+      reconnectTimer = setTimeout(connect, 5000)
+    }
   }
+
+  connect()
+  onUnmounted(() => {
+    ws?.close()
+    if (reconnectTimer) clearTimeout(reconnectTimer)
+  })
 }
 
-onMounted(() => {
-  connectWebSocket()
-})
+onMounted(connectWebSocket)
 </script>
 
 <style scoped>
-.notification-bell {
-  position: relative;
-  cursor: pointer;
-}
+.notification-bell { position: relative; cursor: pointer; }
 .badge {
-  position: absolute;
-  top: -5px;
-  right: -5px;
-  background: #ef4444;
-  color: white;
-  border-radius: 50%;
-  width: 18px;
-  height: 18px;
-  font-size: 0.75rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  position: absolute; top: -5px; right: -5px;
+  background: #ef4444; color: white; border-radius: 50%;
+  width: 18px; height: 18px; font-size: 0.75rem;
+  display: flex; align-items: center; justify-content: center;
 }
 .notification-panel {
-  position: absolute;
-  top: 100%;
-  right: 0;
-  width: 300px;
-  background: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-  max-height: 400px;
-  overflow-y: auto;
-  z-index: 100;
+  position: absolute; top: 100%; right: 0; width: 300px;
+  background: white; border: 1px solid #e5e7eb; border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15); max-height: 400px;
+  overflow-y: auto; z-index: 100;
 }
-.notif-item {
-  padding: 0.75rem;
-  border-bottom: 1px solid #f3f4f6;
-}
-.notif-item.unread {
-  background: #eff6ff;
-}
+.notif-item { padding: 0.75rem; border-bottom: 1px solid #f3f4f6; }
+.notif-item.unread { background: #eff6ff; }
 </style>
 EOF
 
@@ -1117,26 +1142,25 @@ cat > pages/index.vue << 'EOF'
 <script setup lang="ts">
 import type { Product } from '~/types'
 
-// 问题：SEO meta 硬编码，未使用 i18n
 useHead({
   title: '首页 - 测试商城',
   meta: [{ name: 'description', content: '这是一个测试商城' }]
 })
 
-// 问题：没有错误处理和加载状态
-const { data: products } = await useFetch<Product[]>('/api/products', {
+const { data: products, error } = await useFetch<Product[]>('/api/products', {
   default: () => []
 })
+
+if (error.value) {
+  console.error('Failed to load products:', error.value)
+}
 </script>
 
 <style scoped>
 .hero {
-  text-align: center;
-  padding: 4rem 0;
+  text-align: center; padding: 4rem 0;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  border-radius: 12px;
-  margin-bottom: 2rem;
+  color: white; border-radius: 12px; margin-bottom: 2rem;
 }
 .product-grid {
   display: grid;
@@ -1155,12 +1179,12 @@ cat > pages/products/[id].vue << 'EOF'
     </div>
     <div class="product-info">
       <h1>{{ product.name }}</h1>
-      <p class="price">¥{{ product.price.toFixed(2) }}</p>
+      <p class="price">{{ formatPrice(product.price) }}</p>
       <p class="description">{{ product.description }}</p>
       <div class="quantity-selector">
-        <button @click="quantity--" :disabled="quantity <= 1">-</button>
+        <button @click="decreaseQty" :disabled="quantity <= 1">-</button>
         <span>{{ quantity }}</span>
-        <button @click="quantity++">+</button>
+        <button @click="increaseQty" :disabled="quantity >= product.stock">+</button>
       </div>
       <BaseButton variant="primary" @click="handleAdd">加入购物车</BaseButton>
     </div>
@@ -1171,50 +1195,40 @@ cat > pages/products/[id].vue << 'EOF'
 
 <script setup lang="ts">
 import type { Product } from '~/types'
+import { formatPrice } from '~/utils/formatPrice'
 
 const route = useRoute()
 const { addToCart } = useCart()
 const quantity = ref(1)
 
-// 问题：route.params.id 类型不安全，可能为数组
-const { data: product } = await useFetch<Product>(`/api/products/${route.params.id}`)
+const productId = Array.isArray(route.params.id) ? route.params.id[0] : route.params.id
+const { data: product } = await useFetch<Product>(`/api/products/${productId}`)
+
+const increaseQty = () => {
+  if (product.value && quantity.value < product.value.stock) {
+    quantity.value++
+  }
+}
+
+const decreaseQty = () => {
+  if (quantity.value > 1) quantity.value--
+}
 
 const handleAdd = () => {
   if (product.value) {
-    // 问题：quantity 没有上限校验
     addToCart(product.value, quantity.value)
   }
 }
 </script>
 
 <style scoped>
-.product-detail {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 2rem;
-}
-.product-gallery img {
-  width: 100%;
-  border-radius: 8px;
-}
-.price {
-  font-size: 1.5rem;
-  color: #ef4444;
-  font-weight: bold;
-}
-.quantity-selector {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  margin: 1rem 0;
-}
+.product-detail { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
+.product-gallery img { width: 100%; border-radius: 8px; }
+.price { font-size: 1.5rem; color: #ef4444; font-weight: bold; }
+.quantity-selector { display: flex; align-items: center; gap: 1rem; margin: 1rem 0; }
 .quantity-selector button {
-  width: 32px;
-  height: 32px;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
-  background: white;
-  cursor: pointer;
+  width: 32px; height: 32px; border: 1px solid #d1d5db;
+  border-radius: 4px; background: white; cursor: pointer;
 }
 </style>
 EOF
@@ -1234,7 +1248,7 @@ cat > pages/cart.vue << 'EOF'
           <img :src="item.product.imageUrl" :alt="item.product.name" class="item-image" />
           <div class="item-info">
             <h3>{{ item.product.name }}</h3>
-            <p class="item-price">¥{{ item.product.price.toFixed(2) }}</p>
+            <p class="item-price">{{ formatPrice(item.product.price) }}</p>
           </div>
           <div class="item-quantity">
             <button @click="updateQuantity(item.product.id, item.quantity - 1)">-</button>
@@ -1250,43 +1264,19 @@ cat > pages/cart.vue << 'EOF'
 </template>
 
 <script setup lang="ts">
+import { formatPrice } from '~/utils/formatPrice'
+
 const { items, updateQuantity, removeFromCart } = useCart()
 
-useHead({
-  title: `购物车(${items.value.length}) - 测试商城`
-})
+useHead({ title: '购物车 - 测试商城' })
 </script>
 
 <style scoped>
-.cart-layout {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 2rem;
-}
-.cart-item {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 1rem;
-  border-bottom: 1px solid #e5e7eb;
-}
-.item-image {
-  width: 80px;
-  height: 80px;
-  object-fit: cover;
-  border-radius: 4px;
-}
-.item-quantity {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-.remove-btn {
-  color: #ef4444;
-  background: none;
-  border: none;
-  cursor: pointer;
-}
+.cart-layout { display: grid; grid-template-columns: 2fr 1fr; gap: 2rem; }
+.cart-item { display: flex; align-items: center; gap: 1rem; padding: 1rem; border-bottom: 1px solid #e5e7eb; }
+.item-image { width: 80px; height: 80px; object-fit: cover; border-radius: 4px; }
+.item-quantity { display: flex; align-items: center; gap: 0.5rem; }
+.remove-btn { color: #ef4444; background: none; border: none; cursor: pointer; }
 </style>
 EOF
 
@@ -1300,23 +1290,14 @@ cat > pages/dashboard.vue << 'EOF'
       <h2>最近订单</h2>
       <table class="orders-table">
         <thead>
-          <tr>
-            <th>订单号</th>
-            <th>金额</th>
-            <th>状态</th>
-            <th>日期</th>
-          </tr>
+          <tr><th>订单号</th><th>金额</th><th>状态</th><th>日期</th></tr>
         </thead>
         <tbody>
           <tr v-for="order in orders" :key="order.id">
             <td>{{ order.id }}</td>
-            <td>¥{{ order.total.toFixed(2) }}</td>
-            <td>
-              <span :class="['status-badge', `status-${order.status}`]">
-                {{ statusMap[order.status] }}
-              </span>
-            </td>
-            <td>{{ new Date(order.createdAt).toLocaleDateString() }}</td>
+            <td>{{ formatPrice(order.total) }}</td>
+            <td><span :class="['status-badge', `status-${order.status}`]">{{ statusMap[order.status] }}</span></td>
+            <td>{{ formatOrderDate(order.createdAt) }}</td>
           </tr>
         </tbody>
       </table>
@@ -1326,40 +1307,25 @@ cat > pages/dashboard.vue << 'EOF'
 
 <script setup lang="ts">
 import type { Order } from '~/types'
+import { formatPrice } from '~/utils/formatPrice'
 
-definePageMeta({
-  middleware: 'auth'
-})
+definePageMeta({ middleware: 'auth' })
 
 const statusMap: Record<string, string> = {
-  pending: '待支付',
-  paid: '已支付',
-  shipped: '已发货',
-  completed: '已完成'
+  pending: '待支付', paid: '已支付', shipped: '已发货', completed: '已完成'
 }
 
-// 问题：没有分页加载
-const { data: orders } = await useFetch<Order[]>('/api/orders', {
-  default: () => []
-})
+const formatOrderDate = (dateStr: string) => {
+  return new Intl.DateTimeFormat('zh-CN').format(new Date(dateStr))
+}
+
+const { data: orders } = await useFetch<Order[]>('/api/orders', { default: () => [] })
 </script>
 
 <style scoped>
-.orders-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 1rem;
-}
-.orders-table th, .orders-table td {
-  padding: 0.75rem;
-  text-align: left;
-  border-bottom: 1px solid #e5e7eb;
-}
-.status-badge {
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  font-size: 0.875rem;
-}
+.orders-table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+.orders-table th, .orders-table td { padding: 0.75rem; text-align: left; border-bottom: 1px solid #e5e7eb; }
+.status-badge { padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.875rem; }
 .status-pending { background: #fef3c7; color: #92400e; }
 .status-paid { background: #d1fae5; color: #065f46; }
 .status-shipped { background: #dbeafe; color: #1e40af; }
@@ -1373,34 +1339,18 @@ cat > pages/login.vue << 'EOF'
   <div class="login-page">
     <form class="login-form" @submit.prevent="handleLogin">
       <h2>登录</h2>
-      <BaseInput
-        v-model="email"
-        label="邮箱"
-        type="email"
-        placeholder="请输入邮箱"
-        :error="errors.email"
-      />
-      <BaseInput
-        v-model="password"
-        label="密码"
-        type="password"
-        placeholder="请输入密码"
-        :error="errors.password"
-      />
-      <BaseButton variant="primary" type="submit" :loading="loading">
-        登录
-      </BaseButton>
-      <p class="register-link">
-        没有账号？<NuxtLink to="/register">去注册</NuxtLink>
-      </p>
+      <BaseInput v-model="email" label="邮箱" type="email" placeholder="请输入邮箱" :error="errors.email" />
+      <BaseInput v-model="password" label="密码" type="password" placeholder="请输入密码" :error="errors.password" />
+      <BaseButton variant="primary" type="submit" :loading="loading">登录</BaseButton>
+      <p class="register-link">没有账号？<NuxtLink to="/register">去注册</NuxtLink></p>
     </form>
   </div>
 </template>
 
 <script setup lang="ts">
-definePageMeta({
-  layout: 'auth'
-})
+import { validators } from '~/base-layer/utils/validators'
+
+definePageMeta({ layout: 'auth' })
 
 const { login, loading } = useAuth()
 const email = ref('')
@@ -1408,47 +1358,31 @@ const password = ref('')
 const errors = reactive({ email: '', password: '' })
 
 const handleLogin = async () => {
-  // 问题：前端验证不够严格
   errors.email = ''
   errors.password = ''
 
-  if (!email.value) {
-    errors.email = '请输入邮箱'
+  if (!validators.isEmail(email.value)) {
+    errors.email = '请输入有效的邮箱地址'
     return
   }
-  if (!password.value) {
-    errors.password = '请输入密码'
+  if (!password.value || password.value.length < 6) {
+    errors.password = '密码至少 6 个字符'
     return
   }
 
   try {
     await login(email.value, password.value)
     navigateTo('/dashboard')
-  } catch (error: any) {
-    // 问题：将错误信息直接展示，可能泄露系统信息
-    errors.email = error.message
+  } catch {
+    errors.email = '登录失败，请检查邮箱和密码'
   }
 }
 </script>
 
 <style scoped>
-.login-page {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 80vh;
-}
-.login-form {
-  width: 100%;
-  max-width: 400px;
-  padding: 2rem;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-}
-.register-link {
-  text-align: center;
-  margin-top: 1rem;
-}
+.login-page { display: flex; justify-content: center; align-items: center; min-height: 80vh; }
+.login-form { width: 100%; max-width: 400px; padding: 2rem; border: 1px solid #e5e7eb; border-radius: 8px; }
+.register-link { text-align: center; margin-top: 1rem; }
 </style>
 EOF
 
@@ -1475,37 +1409,27 @@ interface UserState {
 export const useUserStore = defineStore('user', {
   state: (): UserState => ({
     currentUser: null,
-    preferences: {
-      language: 'zh-CN',
-      currency: 'CNY',
-      notifications: true
-    }
+    preferences: { language: 'zh-CN', currency: 'CNY', notifications: true }
   }),
 
   getters: {
-    isAdmin(): boolean {
-      return this.currentUser?.role === 'admin'
-    },
-    displayName(): string {
-      return this.currentUser?.name || '游客'
-    }
+    isAdmin(): boolean { return this.currentUser?.role === 'admin' },
+    displayName(): string { return this.currentUser?.name || '游客' }
   },
 
   actions: {
-    setUser(user: User) {
-      this.currentUser = user
-    },
+    setUser(user: User) { this.currentUser = user },
 
     async updatePreferences(prefs: Partial<UserState['preferences']>) {
-      // 问题：乐观更新没有错误回滚
+      const previous = { ...this.preferences }
       Object.assign(this.preferences, prefs)
-      await $fetch('/api/user/preferences', {
-        method: 'PUT',
-        body: this.preferences
-      })
+      try {
+        await $fetch('/api/user/preferences', { method: 'PUT', body: this.preferences })
+      } catch {
+        this.preferences = previous
+      }
     },
 
-    // 问题：没有处理并发调用的情况
     async fetchUser() {
       const user = await $fetch<User>('/api/user/me')
       this.currentUser = user
@@ -1533,9 +1457,9 @@ export const useProductStore = defineStore('products', {
     filteredProducts(): Product[] {
       let result = this.products
       if (this.searchQuery) {
-        // 问题：用 includes 做搜索，没有防抖，大数据量性能差
+        const query = this.searchQuery.toLowerCase()
         result = result.filter(p =>
-          p.name.includes(this.searchQuery) || p.description.includes(this.searchQuery)
+          p.name.toLowerCase().includes(query) || p.description.toLowerCase().includes(query)
         )
       }
       if (this.selectedCategory) {
@@ -1552,7 +1476,6 @@ export const useProductStore = defineStore('products', {
         const response = await $fetch<{ data: Product[]; totalPages: number }>('/api/products', {
           params: { page, pageSize: 20 }
         })
-        // 问题：每次请求都替换整个列表，导致之前的数据丢失（应追加）
         this.products = response.data
         this.totalPages = response.totalPages
         this.currentPage = page
@@ -1562,7 +1485,6 @@ export const useProductStore = defineStore('products', {
     },
 
     async deleteProduct(id: string) {
-      // 问题：没有确认弹窗，直接删除
       await $fetch(`/api/products/${id}`, { method: 'DELETE' })
       this.products = this.products.filter(p => p.id !== id)
     }
@@ -1576,65 +1498,44 @@ EOF
 
 echo "📦 创建 server API..."
 
-mkdir -p server/api/auth server/api/products
-
 # --- server/api/products/index.get.ts ---
 cat > server/api/products/index.get.ts << 'EOF'
 import type { Product } from '~/types'
 
 const mockProducts: Product[] = [
-  {
-    id: '1',
-    name: 'TypeScript 入门教程',
-    price: 49.9,
-    description: '从零开始学习 TypeScript',
-    stock: 100,
-    category: 'books',
-    imageUrl: '/images/ts-book.png'
-  },
-  {
-    id: '2',
-    name: 'Vue.js 实战',
-    price: 69.9,
-    description: 'Vue 3 + Composition API 完整指南',
-    stock: 50,
-    category: 'books',
-    imageUrl: '/images/vue-book.png'
-  },
-  {
-    id: '3',
-    name: '机械键盘',
-    price: 299.0,
-    description: '87键 Cherry MX 红轴',
-    stock: 3,
-    category: 'electronics',
-    imageUrl: '/images/keyboard.png'
-  }
+  { id: '1', name: 'TypeScript 入门教程', price: 49.9, description: '从零开始学习 TypeScript', stock: 100, category: 'books', imageUrl: '/images/ts-book.png' },
+  { id: '2', name: 'Vue.js 实战', price: 69.9, description: 'Vue 3 + Composition API 完整指南', stock: 50, category: 'books', imageUrl: '/images/vue-book.png' },
+  { id: '3', name: '机械键盘', price: 299.0, description: '87键 Cherry MX 红轴', stock: 3, category: 'electronics', imageUrl: '/images/keyboard.png' }
 ]
 
 export default defineEventHandler((event) => {
   const query = getQuery(event)
-  const page = Number(query.page) || 1
-  const pageSize = Number(query.pageSize) || 20
+  const page = Math.max(1, Number(query.page) || 1)
+  const pageSize = Math.min(100, Math.max(1, Number(query.pageSize) || 20))
 
-  // 问题：没有对 page/pageSize 做安全校验
   const start = (page - 1) * pageSize
   const data = mockProducts.slice(start, start + pageSize)
 
-  return {
-    data,
-    totalPages: Math.ceil(mockProducts.length / pageSize)
-  }
+  return { data, totalPages: Math.ceil(mockProducts.length / pageSize) }
 })
 EOF
 
 # --- server/api/auth/login.post.ts ---
 cat > server/api/auth/login.post.ts << 'EOF'
+import { createHmac, randomUUID } from 'crypto'
+
 export default defineEventHandler(async (event) => {
   const body = await readBody(event)
 
-  // 问题：硬编码的测试凭据
-  if (body.email === 'admin@test.com' && body.password === 'admin123') {
+  if (!body.email || !body.password) {
+    throw createError({ statusCode: 400, statusMessage: '请提供邮箱和密码' })
+  }
+
+  // In production: use bcrypt + database lookup
+  const storedHash = createHmac('sha256', 'server-secret').update('admin123').digest('hex')
+  const inputHash = createHmac('sha256', 'server-secret').update(body.password).digest('hex')
+
+  if (body.email === 'admin@test.com' && storedHash === inputHash) {
     return {
       user: {
         id: '1',
@@ -1643,43 +1544,46 @@ export default defineEventHandler(async (event) => {
         role: 'admin',
         createdAt: new Date().toISOString()
       },
-      // 问题：token 生成方式不安全
-      token: Buffer.from(`${body.email}:${Date.now()}`).toString('base64')
+      token: randomUUID()
     }
   }
 
-  throw createError({
-    statusCode: 401,
-    // 问题：错误信息暴露了用户是否存在
-    statusMessage: '用户不存在或密码错误'
-  })
+  throw createError({ statusCode: 401, statusMessage: '认证失败' })
 })
 EOF
 
 # --- server/api/webhook.ts ---
 cat > server/api/webhook.ts << 'EOF'
+import { createHmac, timingSafeEqual } from 'crypto'
+
 export default defineEventHandler(async (event) => {
   const body = await readBody(event)
   const headers = getHeaders(event)
+  const signature = headers['x-hub-signature-256']
 
-  // 问题：webhook 签名验证缺失
-  // 应该验证 x-hub-signature-256 头部
+  if (!signature) {
+    throw createError({ statusCode: 401, statusMessage: 'Missing signature' })
+  }
 
-  // 问题：没有幂等性处理
+  const config = useRuntimeConfig()
+  const expected = 'sha256=' + createHmac('sha256', config.webhookSecret || '')
+    .update(JSON.stringify(body))
+    .digest('hex')
+
+  const sigBuffer = Buffer.from(signature)
+  const expectedBuffer = Buffer.from(expected)
+
+  if (sigBuffer.length !== expectedBuffer.length || !timingSafeEqual(sigBuffer, expectedBuffer)) {
+    throw createError({ statusCode: 401, statusMessage: 'Invalid signature' })
+  }
+
   const eventType = headers['x-github-event']
 
   switch (eventType) {
     case 'push':
-      // 处理推送事件
-      console.log('Push event received:', body.ref)
       break
     case 'pull_request':
-      // 处理 PR 事件
-      console.log('PR event:', body.action, body.pull_request?.title)
       break
-    default:
-      // 问题：不识别的事件类型应该返回 2xx 而不是记录后继续
-      console.log('Unknown event type:', eventType)
   }
 
   return { received: true }
@@ -1688,24 +1592,23 @@ EOF
 
 # --- server/api/orders.post.ts ---
 cat > server/api/orders.post.ts << 'EOF'
+import { randomUUID } from 'crypto'
+
 export default defineEventHandler(async (event) => {
   const body = await readBody(event)
 
-  // 问题：没有验证用户身份（从 token 获取 userId）
-  // 问题：没有验证订单总额是否与商品价格一致（防止篡改）
-  // 问题：没有库存扣减的原子性保障
+  if (!body.items || !Array.isArray(body.items) || body.items.length === 0) {
+    throw createError({ statusCode: 400, statusMessage: '订单不能为空' })
+  }
 
   const order = {
-    id: `ORD-${Date.now()}`,
-    userId: 'unknown',
+    id: `ORD-${randomUUID().slice(0, 8)}`,
+    userId: 'authenticated-user',
     items: body.items,
     total: body.total,
     status: 'pending',
     createdAt: new Date().toISOString()
   }
-
-  // 模拟保存
-  console.log('New order created:', order.id)
 
   return order
 })
@@ -1723,8 +1626,7 @@ export default defineNuxtRouteMiddleware((to, _from) => {
   const { user } = useAuth()
 
   if (!user.value) {
-    // 问题：returnUrl 未编码可能导致 open redirect
-    return navigateTo(`/login?returnUrl=${to.fullPath}`)
+    return navigateTo(`/login?returnUrl=${encodeURIComponent(to.fullPath)}`)
   }
 })
 EOF
@@ -1738,7 +1640,6 @@ export default defineNuxtRouteMiddleware((_to, _from) => {
     return navigateTo('/login')
   }
 
-  // 问题：仅前端权限检查，没有后端验证
   if (user.value.role !== 'admin') {
     return abortNavigation()
   }
@@ -1754,19 +1655,16 @@ echo "📦 创建 plugins..."
 # --- plugins/auth.client.ts ---
 cat > plugins/auth.client.ts << 'EOF'
 export default defineNuxtPlugin(async () => {
-  const { user } = useAuth()
+  const { user, token } = useAuth()
 
-  // 问题：从 localStorage 读取 token 并直接使用，没有验证有效性
-  const token = localStorage.getItem('auth_token')
-  if (token) {
+  if (token.value) {
     try {
       const response = await $fetch<{ user: any }>('/api/auth/verify', {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token.value}` }
       })
       user.value = response.user
     } catch {
-      // token 过期，清理
-      localStorage.removeItem('auth_token')
+      token.value = null
     }
   }
 })
@@ -1775,24 +1673,21 @@ EOF
 # --- plugins/analytics.client.ts ---
 cat > plugins/analytics.client.ts << 'EOF'
 export default defineNuxtPlugin((nuxtApp) => {
-  // 问题：直接将用户行为数据发送到外部服务，没有脱敏
-  nuxtApp.hook('page:finish', () => {
-    const route = useRoute()
-    const { user } = useAuth()
+  const consentGiven = useCookie('analytics_consent')
 
-    // 问题：没有检查用户是否同意数据收集（GDPR）
-    fetch('https://analytics.example.com/track', {
+  nuxtApp.hook('page:finish', () => {
+    if (!consentGiven.value) return
+
+    const route = useRoute()
+
+    fetch('/api/analytics/track', {
       method: 'POST',
       body: JSON.stringify({
-        page: route.fullPath,
-        userId: user.value?.id,
-        email: user.value?.email,
+        page: route.path,
         timestamp: Date.now()
       }),
       keepalive: true
-    }).catch(() => {
-      // 静默失败
-    })
+    }).catch(() => {})
   })
 })
 EOF
@@ -1805,81 +1700,81 @@ echo "📦 创建 utils..."
 
 # --- utils/formatPrice.ts ---
 cat > utils/formatPrice.ts << 'EOF'
-// 问题：浮点数精度处理不当
+const formatter = new Intl.NumberFormat('zh-CN', {
+  style: 'currency',
+  currency: 'CNY',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2
+})
+
 export const formatPrice = (price: number): string => {
-  return `¥${price.toFixed(2)}`
+  return formatter.format(price)
 }
 
-// 问题：没有处理负数和溢出
 export const calculateDiscount = (price: number, discountPercent: number): number => {
-  return price * (1 - discountPercent / 100)
+  if (discountPercent < 0 || discountPercent > 100) return price
+  return Math.round(price * (100 - discountPercent)) / 100
 }
 
-// 问题：简单的字符串拼接，没有国际化支持
 export const formatCurrency = (amount: number, currency: string = 'CNY'): string => {
-  if (currency === 'CNY') return `¥${amount.toFixed(2)}`
-  if (currency === 'USD') return `$${amount.toFixed(2)}`
-  return `${amount.toFixed(2)} ${currency}`
+  return new Intl.NumberFormat('zh-CN', {
+    style: 'currency',
+    currency,
+    minimumFractionDigits: 2
+  }).format(amount)
 }
 EOF
 
 # --- utils/crypto-helper.ts ---
 cat > utils/crypto-helper.ts << 'EOF'
-// 问题：自定义加密函数，不应该自己实现加密
-export const hashPassword = (password: string): string => {
-  let hash = 0
-  for (let i = 0; i < password.length; i++) {
-    const char = password.charCodeAt(i)
-    hash = ((hash << 5) - hash) + char
-    hash = hash & hash // Convert to 32bit integer
-  }
-  return hash.toString(16)
+export const hashPassword = async (password: string): Promise<string> => {
+  const encoder = new TextEncoder()
+  const data = encoder.encode(password)
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+  const hashArray = Array.from(new Uint8Array(hashBuffer))
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
-// 问题：Math.random 不是密码学安全的随机数生成器
 export const generateToken = (length: number = 32): string => {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
-  let result = ''
-  for (let i = 0; i < length; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length))
-  }
-  return result
+  const array = new Uint8Array(length)
+  crypto.getRandomValues(array)
+  return Array.from(array, b => b.toString(16).padStart(2, '0')).join('')
 }
 
-// 问题：没有 timing-safe 比较
 export const verifyToken = (provided: string, expected: string): boolean => {
-  return provided === expected
+  if (provided.length !== expected.length) return false
+  let result = 0
+  for (let i = 0; i < provided.length; i++) {
+    result |= provided.charCodeAt(i) ^ expected.charCodeAt(i)
+  }
+  return result === 0
 }
 EOF
 
 # --- utils/date-helper.ts ---
 cat > utils/date-helper.ts << 'EOF'
-// 问题：没有时区处理
+const dateFormatter = new Intl.DateTimeFormat('zh-CN', { dateStyle: 'short' })
+const dateTimeFormatter = new Intl.DateTimeFormat('zh-CN', { dateStyle: 'short', timeStyle: 'short' })
+
 export const formatDate = (date: string | Date): string => {
-  const d = new Date(date)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  return dateFormatter.format(new Date(date))
 }
 
 export const formatDateTime = (date: string | Date): string => {
-  const d = new Date(date)
-  return `${formatDate(d)} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  return dateTimeFormatter.format(new Date(date))
 }
 
-// 问题：相对时间计算没有考虑时区和国际化
+const rtf = new Intl.RelativeTimeFormat('zh-CN', { numeric: 'auto' })
+
 export const timeAgo = (date: string | Date): string => {
   const now = Date.now()
   const past = new Date(date).getTime()
-  const diff = now - past
+  const diffSeconds = Math.floor((now - past) / 1000)
 
-  const seconds = Math.floor(diff / 1000)
-  const minutes = Math.floor(seconds / 60)
-  const hours = Math.floor(minutes / 60)
-  const days = Math.floor(hours / 24)
-
-  if (days > 0) return `${days}天前`
-  if (hours > 0) return `${hours}小时前`
-  if (minutes > 0) return `${minutes}分钟前`
-  return '刚刚'
+  if (diffSeconds < 60) return rtf.format(-diffSeconds, 'second')
+  if (diffSeconds < 3600) return rtf.format(-Math.floor(diffSeconds / 60), 'minute')
+  if (diffSeconds < 86400) return rtf.format(-Math.floor(diffSeconds / 3600), 'hour')
+  return rtf.format(-Math.floor(diffSeconds / 86400), 'day')
 }
 EOF
 
@@ -1902,15 +1797,15 @@ class ApiClient {
     this.retries = config.retries || 0
   }
 
-  async get<T>(url: string, params?: Record<string, any>): Promise<T> {
+  async get<T>(url: string, params?: Record<string, unknown>): Promise<T> {
     return this.request<T>('GET', url, { params })
   }
 
-  async post<T>(url: string, body?: any): Promise<T> {
+  async post<T>(url: string, body?: unknown): Promise<T> {
     return this.request<T>('POST', url, { body })
   }
 
-  async put<T>(url: string, body?: any): Promise<T> {
+  async put<T>(url: string, body?: unknown): Promise<T> {
     return this.request<T>('PUT', url, { body })
   }
 
@@ -1918,11 +1813,15 @@ class ApiClient {
     return this.request<T>('DELETE', url)
   }
 
-  private async request<T>(method: string, url: string, options: any = {}): Promise<T> {
-    let lastError: Error | null = null
+  private isIdempotent(method: string): boolean {
+    return ['GET', 'PUT', 'DELETE', 'HEAD', 'OPTIONS'].includes(method)
+  }
 
-    // 问题：重试逻辑对所有请求都重试，POST 等非幂等请求不应重试
-    for (let attempt = 0; attempt <= this.retries; attempt++) {
+  private async request<T>(method: string, url: string, options: Record<string, unknown> = {}): Promise<T> {
+    let lastError: Error | null = null
+    const maxAttempts = this.isIdempotent(method) ? this.retries + 1 : 1
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
       try {
         const response = await $fetch<T>(`${this.baseURL}${url}`, {
           method: method as any,
@@ -1930,11 +1829,11 @@ class ApiClient {
           timeout: this.timeout
         })
         return response
-      } catch (error: any) {
-        lastError = error
-        // 问题：没有指数退避
-        if (attempt < this.retries) {
-          await new Promise(resolve => setTimeout(resolve, 1000))
+      } catch (error: unknown) {
+        lastError = error instanceof Error ? error : new Error(String(error))
+        if (attempt < maxAttempts - 1) {
+          const delay = Math.min(1000 * Math.pow(2, attempt), 10000)
+          await new Promise(resolve => setTimeout(resolve, delay))
         }
       }
     }
@@ -1951,7 +1850,7 @@ export const apiClient = new ApiClient({
 EOF
 
 # ============================================================================
-# Layouts（主项目覆盖）
+# Layouts
 # ============================================================================
 
 # --- layouts/auth.vue ---
@@ -1960,9 +1859,7 @@ cat > layouts/auth.vue << 'EOF'
   <div class="layout-auth">
     <div class="auth-container">
       <div class="auth-brand">
-        <NuxtLink to="/">
-          <h1>AI Reviewer 测试商城</h1>
-        </NuxtLink>
+        <NuxtLink to="/"><h1>AI Reviewer 测试商城</h1></NuxtLink>
       </div>
       <slot />
     </div>
@@ -1970,22 +1867,9 @@ cat > layouts/auth.vue << 'EOF'
 </template>
 
 <style scoped>
-.layout-auth {
-  min-height: 100vh;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background: #f3f4f6;
-}
-.auth-container {
-  width: 100%;
-  max-width: 480px;
-  padding: 2rem;
-}
-.auth-brand {
-  text-align: center;
-  margin-bottom: 2rem;
-}
+.layout-auth { min-height: 100vh; display: flex; justify-content: center; align-items: center; background: #f3f4f6; }
+.auth-container { width: 100%; max-width: 480px; padding: 2rem; }
+.auth-brand { text-align: center; margin-bottom: 2rem; }
 </style>
 EOF
 
@@ -1993,7 +1877,6 @@ EOF
 # App entry
 # ============================================================================
 
-# --- app.vue ---
 cat > app.vue << 'EOF'
 <template>
   <NuxtLayout>
@@ -2026,11 +1909,7 @@ cat > assets/css/main.css << 'EOF'
   --color-bg-secondary: #f9fafb;
 }
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+* { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -2039,62 +1918,21 @@ body {
   line-height: 1.6;
 }
 
-a {
-  color: var(--color-primary);
-  text-decoration: none;
-}
+a { color: var(--color-primary); text-decoration: none; }
 EOF
-
-# ============================================================================
-# GitHub Action 配置（已有 .github 目录）
-# ============================================================================
-
-echo "📦 检查 .github 目录..."
-
-mkdir -p .github/workflows
-
-# 确保 workflows 目录存在但不覆盖已有配置
-if [ ! -f .github/workflows/ai-review.yml ]; then
-cat > .github/workflows/ai-review.yml << 'EOF'
-name: AI Code Review
-
-on:
-  pull_request:
-    types: [opened, synchronize]
-  issue_comment:
-    types: [created]
-
-jobs:
-  review:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: AI Review
-        uses: ./ai-reviewer
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          openai_api_key: ${{ secrets.OPENAI_API_KEY }}
-EOF
-fi
 
 # ============================================================================
 # CodeSentinel 配置文件
 # ============================================================================
 
 cat > .codesentinel.yaml << 'EOF'
-# AI Reviewer (CodeSentinel) 配置
-# 用于测试命令系统功能
-
-# 审查语言
 language: "zh-CN"
 
-# 文件过滤
 path_filters:
   - "!node_modules/**"
   - "!.nuxt/**"
   - "!dist/**"
   - "!*.lock"
-  - "src/**"
   - "components/**"
   - "composables/**"
   - "pages/**"
@@ -2103,145 +1941,25 @@ path_filters:
   - "utils/**"
   - "base-layer/**"
 
-# 审查设置
 max_files: 50
 max_review_comments: 20
 
-# 依赖分析
 enable_dependency_analysis: true
 max_dependency_files: 10
 
-# Lint 工具
 enable_lint_tools: true
 enable_eslint: true
 
-# 功能开关
 enable_web_search: true
-enable_shell: false
+enable_shell: true
 EOF
 
 # ============================================================================
-# 测试命令参考文档
-# ============================================================================
-
-mkdir -p docs
-
-cat > docs/command-test-guide.md << 'EOF'
-# 测试人 2 - 命令系统测试指南
-
-## 测试前提
-确保 AI Reviewer Bot 已正确配置并能响应 PR 事件。
-
-## 测试步骤
-
-### 第一阶段：提交代码触发审查
-1. 执行本脚本生成测试代码
-2. 提交所有变更并创建 PR
-3. 等待 Bot 自动审查，产出行级评论（供后续 resolve 测试使用）
-
-### 第二阶段：命令系统测试
-
-在 PR 评论中按顺序执行以下命令：
-
-```
-# 2.1 命令解析与路由
-@codesentinel help                    → 期望：展示所有命令用法
-@ai-reviewer help                     → 期望：别名同样触发
-@codesentinel invalidcmd              → 期望：提示无效命令
-@CodeSentinel HELP                    → 期望：大小写不敏感
-
-# 2.2 权限（需不同权限账号）
-# write 权限用户执行 review → 期望成功
-# read 权限用户执行 review → 期望 FORBIDDEN
-
-# 2.3 resolve 命令
-@codesentinel resolve                 → 期望：批量解决 Bot 评论 + 统计
-
-# 2.4 审查控制命令
-@codesentinel review                  → 期望：触发增量审查
-@codesentinel full review             → 期望：全量审查
-@codesentinel summary                 → 期望：重新生成摘要
-@codesentinel configuration           → 期望：展示当前配置
-
-# 2.4 暂停/恢复
-@codesentinel pause                   → 期望：PR 描述写入暂停标记
-（push 新 commit）                     → 期望：不自动触发审查
-@codesentinel resume                  → 期望：恢复审查
-（push 新 commit）                     → 期望：触发审查
-
-# 2.5 ACK 反馈
-观察每个命令执行时：
-- 评论上是否出现 🚀 表情
-- 耗时命令是否有进度回帖
-- 错误信息是否清晰
-
-# 限流测试
-快速连续发送 5 次 @codesentinel help    → 期望：被限流
-```
-
-### 第三阶段：增量审查验证
-
-1. 在 Bot 完成首次审查后
-2. 修改一个文件（如 utils/formatPrice.ts）并 push
-3. 使用 `@codesentinel review` 触发增量审查
-4. 验证仅审查新增变更
-
-## 预期产出
-
-| 测试点 | 命令 | 期望行为 |
-|--------|------|----------|
-| 2.1.1 | `@codesentinel help` | 展示所有命令 |
-| 2.1.2 | `@ai-reviewer help` | 别名触发 |
-| 2.1.3 | `@codesentinel xyz` | 无效命令提示 |
-| 2.1.6 | `@CodeSentinel HELP` | 大小写不敏感 |
-| 2.3.1 | `@codesentinel resolve` | 批量解决 |
-| 2.4.1 | `@codesentinel review` | 增量审查 |
-| 2.4.2 | `@codesentinel full review` | 全量审查 |
-| 2.4.3 | `@codesentinel summary` | 重新摘要 |
-| 2.4.4 | `@codesentinel pause` | 暂停标记 |
-| 2.4.6 | `@codesentinel resume` | 恢复审查 |
-| 2.4.7 | `@codesentinel configuration` | 配置展示 |
-EOF
-
-# ============================================================================
-# 完成
-# ============================================================================
-
 echo ""
-echo "✅ 测试项目生成完成！"
-echo ""
-echo "📁 项目结构："
-echo "  ├── base-layer/          (Nuxt extends 基础层)"
-echo "  │   ├── components/"
-echo "  │   ├── composables/"
-echo "  │   ├── utils/"
-echo "  │   ├── plugins/"
-echo "  │   ├── middleware/"
-echo "  │   ├── layouts/"
-echo "  │   └── nuxt.config.ts"
-echo "  ├── components/          (主项目组件)"
-echo "  │   └── ui/"
-echo "  ├── composables/         (主项目 composables)"
-echo "  ├── layouts/             (主项目 layouts)"
-echo "  ├── middleware/          (路由中间件)"
-echo "  ├── pages/               (页面路由)"
-echo "  ├── plugins/             (Nuxt 插件)"
-echo "  ├── server/api/          (Nitro API)"
-echo "  ├── stores/              (Pinia stores)"
-echo "  ├── utils/               (工具函数)"
-echo "  ├── types/               (类型定义)"
-echo "  ├── assets/css/          (样式)"
-echo "  ├── docs/                (测试文档)"
-echo "  ├── .codesentinel.yaml   (Bot 配置)"
-echo "  ├── nuxt.config.ts       (extends base-layer)"
-echo "  └── package.json"
+echo "✅ 基线项目生成完成！"
 echo ""
 echo "📋 下一步操作："
 echo "  1. git add -A"
-echo "  2. git commit -m 'feat: add nuxt.js test project for command system testing'"
-echo "  3. 创建 PR 到 main 分支"
-echo "  4. 等待 Bot 审查产出评论"
-echo "  5. 按 docs/command-test-guide.md 执行命令测试"
-echo ""
-echo "⚠️  注意：项目包含大量有意的代码问题，用于触发 AI Reviewer 产出评论"
-echo "    这些评论是后续 resolve/review 命令测试的前提条件"
+echo "  2. git commit -m 'feat: add nuxt.js test project baseline'"
+echo "  3. git push origin main"
+echo "  4. 然后切到 feature 分支执行 docs/generate-issues.sh"

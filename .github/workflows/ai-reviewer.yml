@@ -9,7 +9,7 @@ on:
   push:
     branches:
       - main
-      - 'test/dev*'
+      - "test/dev*"
   pull_request:
     types: [opened, synchronize, reopened]
   pull_request_review_comment:
@@ -65,15 +65,21 @@ jobs:
           GITHUB_TOKEN: ${{ steps.bot-token.outputs.token }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         with:
+          # ── General Settings ──────────────────────────────────────
           bot_github_login: "codesentinel-review-bot[bot]"
-          # resolve_token: ${{ secrets.BOT_PAT }}
+          bot_name: "CodeSentinel"
+          bot_icon: "🦉"
+          language: "zh-CN"
+          command_ack_reaction: "rocket"
           debug: true
+
+          # ── Review Control ────────────────────────────────────────
+          disable_review: false
+          disable_release_notes: false
+          max_files: 150
+          max_review_comments: 20
           review_simple_changes: false
           review_comment_lgtm: false
-          openai_heavy_model: gpt-5.4-mini
-          enable_shell: true
-          enable_web_search: true
-          enable_dependency_analysis: true
           path_filters: |
             **/*.ts
             **/*.vue
@@ -86,6 +92,37 @@ jobs:
             !node_modules/**
             !dist/**
             !.output/**
+
+          # ── Model Configuration ──────────────────────────────────
+          openai_base_url: "https://api.openai.com/v1"
+          openai_light_model: "gpt-5.4-nano"
+          openai_heavy_model: "gpt-5.4-mini"
+          openai_model_temperature: "0.0"
+          openai_retries: 5
+          openai_timeout_ms: 360000
+          openai_concurrency_limit: 6
+          github_concurrency_limit: 6
+
+          # ── AI Capabilities (Tool Use) ───────────────────────────
+          enable_shell: true
+          enable_web_search: true
+
+          # ── Cross-File Dependency Analysis ───────────────────────
+          enable_dependency_analysis: true
+          max_dependency_files: 50
+
+          # ── Static Analysis (Master Switch) ──────────────────────
           enable_lint_tools: true
+
+          # ── Per-Tool Enable Flags ────────────────────────────────
+          enable_eslint: true
+          enable_biome: true
+          enable_tsc: true
+          enable_prettier: false
           enable_semgrep: true
-          debug_resolve_inject_failures: "3"
+
+          # ── Per-Tool Version Pinning ────────────────────────────
+          eslint_version: "^9.15.0"
+          biome_version: "^2.3.0"
+          tsc_version: "^5.6.0"
+          prettier_version: "^3.0.0"

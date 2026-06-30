@@ -1,0 +1,26 @@
+language: "zh-CN"
+
+path_filters:
+  - "!node_modules/**"
+  - "!.nuxt/**"
+  - "!dist/**"
+  - "!*.lock"
+  - "components/**"
+  - "composables/**"
+  - "pages/**"
+  - "server/**"
+  - "stores/**"
+  - "utils/**"
+  - "base-layer/**"
+
+max_files: 50
+max_review_comments: 20
+
+enable_dependency_analysis: true
+max_dependency_files: 10
+
+enable_lint_tools: true
+enable_eslint: true
+
+enable_web_search: true
+enable_shell: true
