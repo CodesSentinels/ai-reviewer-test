@@ -1,0 +1,6 @@
+/* generated: 2026-07-01 15:17:18 */
+/* 这个 CSS 文件不在 path_filters 范围内，Bot 不应审查 */
+.button {
+  color: red
+  background: blue;  /* 故意缺少分号，但 Bot 不应注意到 */
+}

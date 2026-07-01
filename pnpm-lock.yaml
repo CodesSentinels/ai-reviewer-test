@@ -1,0 +1,6 @@
+lockfileVersion: '9.0'
+
+# test: tester-1 filter test marker
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
