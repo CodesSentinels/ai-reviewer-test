@@ -32,7 +32,7 @@ echo "================================================================"
 echo ""
 
 git checkout "$BRANCH"
-git pull origin "$BRANCH" --quiet
+git fetch origin "$BRANCH" --quiet
 
 # ---- Commit B ----
 echo "==> Commit B: 追加 divide + power（含已知问题）"
@@ -59,7 +59,7 @@ git commit -m "feat: add divide + power to math utils (Commit B - incremental re
 - divide: 未检查 b=0 的除零情况
 - power: 负指数时循环不执行，结果错误"
 
-git push
+git push origin "${BRANCH}:${BRANCH}"
 
 echo ""
 echo "================================================================"

@@ -22,8 +22,12 @@ cd "$REPO_ROOT"
 if [[ -z "${GITHUB_TOKEN:-}" ]]; then
   SECRETS_FILE="$REPO_ROOT/.secrets"
   if [[ -f "$SECRETS_FILE" ]]; then
-    export GITHUB_TOKEN="$(grep '^GITHUB_TOKEN=' "$SECRETS_FILE" | cut -d= -f2)"
+    export GITHUB_TOKEN="$(grep '^GITHUB_TOKEN=' "$SECRETS_FILE" | sed 's/^GITHUB_TOKEN=//' | tr -d '[:space:]')"
   fi
+fi
+if [[ -z "${GITHUB_TOKEN:-}" ]]; then
+  echo "❌ GITHUB_TOKEN 未设置，请在 .secrets 文件中配置或通过环境变量传入" >&2
+  exit 1
 fi
 export GH_TOKEN="$GITHUB_TOKEN"
 
@@ -38,11 +42,13 @@ echo ""
 
 git fetch origin "$BASE_BRANCH" --quiet
 git checkout -b "$BRANCH" "origin/$BASE_BRANCH"
+git branch --unset-upstream
 
 # ---- 1.4.2: .css 文件（应被 path_filters 排除）----
 echo "==> 创建 assets/ignored.css（应被排除）"
 mkdir -p assets
-cat > assets/ignored.css << 'EOF'
+printf '/* generated: %s */\n' "$(date '+%Y-%m-%d %H:%M:%S')" > assets/ignored.css
+cat >> assets/ignored.css << 'EOF'
 /* 这个 CSS 文件不在 path_filters 范围内，Bot 不应审查 */
 .button {
   color: red
@@ -81,8 +87,8 @@ sys.stdout.buffer.write(base64.b64decode(data))
 
 # ---- 真正需要审查的代码变更 ----
 echo "==> 创建 utils/filter-test.ts（应被审查）"
-cat > utils/filter-test.ts << 'EOF'
-// utils/filter-test.ts
+printf '// utils/filter-test.ts\n// generated: %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" > utils/filter-test.ts
+cat >> utils/filter-test.ts << 'EOF'
 // 这是唯一应该被审查的文件（.ts 在 path_filters 范围内）
 
 export function processUserData(data: any) {
@@ -106,7 +112,7 @@ git commit -m "test: file filter validation (1.4.1 / 1.4.2 / 1.4.4)
 - assets/test-icon.png     [二进制, 应被排除]
 - pnpm-lock.yaml           [*.lock, 应被排除]"
 
-git push -u origin "$BRANCH"
+git push origin "${BRANCH}:${BRANCH}"
 
 PR_URL=$(gh pr create \
   --title "[TEST 1.4] 文件过滤验证：二进制 / CSS / lock 排除" \

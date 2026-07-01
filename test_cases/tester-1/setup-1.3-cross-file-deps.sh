@@ -28,8 +28,12 @@ cd "$REPO_ROOT"
 if [[ -z "${GITHUB_TOKEN:-}" ]]; then
   SECRETS_FILE="$REPO_ROOT/.secrets"
   if [[ -f "$SECRETS_FILE" ]]; then
-    export GITHUB_TOKEN="$(grep '^GITHUB_TOKEN=' "$SECRETS_FILE" | cut -d= -f2)"
+    export GITHUB_TOKEN="$(grep '^GITHUB_TOKEN=' "$SECRETS_FILE" | sed 's/^GITHUB_TOKEN=//' | tr -d '[:space:]')"
   fi
+fi
+if [[ -z "${GITHUB_TOKEN:-}" ]]; then
+  echo "❌ GITHUB_TOKEN 未设置，请在 .secrets 文件中配置或通过环境变量传入" >&2
+  exit 1
 fi
 export GH_TOKEN="$GITHUB_TOKEN"
 
@@ -49,10 +53,12 @@ echo ""
 
 git fetch origin "$BASE_BRANCH" --quiet
 git checkout -b "$BRANCH" "origin/$BASE_BRANCH"
+git branch --unset-upstream
 
 # ---- 变更 1: formatPrice 签名破坏性改动 ----
 echo "==> 修改 utils/formatPrice.ts（签名破坏性变更）"
-cat > utils/formatPrice.ts << 'EOF'
+printf '// generated: %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" > utils/formatPrice.ts
+cat >> utils/formatPrice.ts << 'EOF'
 /**
  * 价格格式化工具
  *
@@ -80,7 +86,8 @@ EOF
 
 # ---- 变更 2: useCart 返回类型变更 ----
 echo "==> 修改 composables/useCart.ts（返回类型破坏性变更）"
-cat > composables/useCart.ts << 'EOF'
+printf '// generated: %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" > composables/useCart.ts
+cat >> composables/useCart.ts << 'EOF'
 /**
  * 购物车 composable
  *
@@ -144,7 +151,7 @@ composables/useCart.ts:
   - components/CartSummary.vue（auto-import useCart）
   - pages/cart.vue（auto-import useCart）"
 
-git push -u origin "$BRANCH"
+git push origin "${BRANCH}:${BRANCH}"
 
 PR_URL=$(gh pr create \
   --title "[TEST 1.3] 跨文件依赖分析：破坏性签名变更" \

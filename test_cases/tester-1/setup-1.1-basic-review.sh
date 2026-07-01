@@ -23,8 +23,12 @@ cd "$REPO_ROOT"
 if [[ -z "${GITHUB_TOKEN:-}" ]]; then
   SECRETS_FILE="$REPO_ROOT/.secrets"
   if [[ -f "$SECRETS_FILE" ]]; then
-    export GITHUB_TOKEN="$(grep '^GITHUB_TOKEN=' "$SECRETS_FILE" | cut -d= -f2)"
+    export GITHUB_TOKEN="$(grep '^GITHUB_TOKEN=' "$SECRETS_FILE" | sed 's/^GITHUB_TOKEN=//' | tr -d '[:space:]')"
   fi
+fi
+if [[ -z "${GITHUB_TOKEN:-}" ]]; then
+  echo "❌ GITHUB_TOKEN 未设置，请在 .secrets 文件中配置或通过环境变量传入" >&2
+  exit 1
 fi
 export GH_TOKEN="$GITHUB_TOKEN"
 
@@ -40,11 +44,12 @@ echo ""
 # 确保从 base 拉出新分支
 git fetch origin "$BASE_BRANCH" --quiet
 git checkout -b "$BRANCH" "origin/$BASE_BRANCH"
+git branch --unset-upstream
 
 # ---- 1.1.1 / 1.1.2 / 1.1.3 / 1.1.4: 含安全问题的代码 ----
 echo "==> 写入含已知问题的文件 utils/insecure-api.ts"
-cat > utils/insecure-api.ts << 'EOF'
-// utils/insecure-api.ts
+printf '// utils/insecure-api.ts\n// generated: %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" > utils/insecure-api.ts
+cat >> utils/insecure-api.ts << 'TSEOF'
 import { createServer } from 'http'
 
 /**
@@ -76,7 +81,7 @@ export function handleRequest(req: any, res: any) {
   saveData({ query, result })
   res.end(JSON.stringify({ result }))
 }
-EOF
+TSEOF
 
 git add utils/insecure-api.ts
 git commit -m "feat: add insecure-api utils (1.1 基础审查测试)
@@ -88,7 +93,7 @@ git commit -m "feat: add insecure-api utils (1.1 基础审查测试)
 - 循环内重复创建正则表达式"
 
 # 推送
-git push -u origin "$BRANCH"
+git push origin "${BRANCH}:${BRANCH}"
 
 # 创建 PR 1.1.1 — 正常触发审查
 PR_URL=$(gh pr create \

@@ -27,8 +27,12 @@ cd "$REPO_ROOT"
 if [[ -z "${GITHUB_TOKEN:-}" ]]; then
   SECRETS_FILE="$REPO_ROOT/.secrets"
   if [[ -f "$SECRETS_FILE" ]]; then
-    export GITHUB_TOKEN="$(grep '^GITHUB_TOKEN=' "$SECRETS_FILE" | cut -d= -f2)"
+    export GITHUB_TOKEN="$(grep '^GITHUB_TOKEN=' "$SECRETS_FILE" | sed 's/^GITHUB_TOKEN=//' | tr -d '[:space:]')"
   fi
+fi
+if [[ -z "${GITHUB_TOKEN:-}" ]]; then
+  echo "❌ GITHUB_TOKEN 未设置，请在 .secrets 文件中配置或通过环境变量传入" >&2
+  exit 1
 fi
 export GH_TOKEN="$GITHUB_TOKEN"
 
@@ -46,11 +50,12 @@ echo ""
 
 git fetch origin "$BASE_BRANCH" --quiet
 git checkout -b "$BRANCH" "origin/$BASE_BRANCH"
+git branch --unset-upstream
 
 # ---- Commit A ----
 echo "==> Commit A: 新增 utils/math.ts（基础运算）"
-cat > utils/math.ts << 'EOF'
-// utils/math.ts
+printf '// utils/math.ts\n// generated: %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" > utils/math.ts
+cat >> utils/math.ts << 'TSEOF'
 export function add(a: number, b: number): number {
   return a + b
 }
@@ -58,12 +63,15 @@ export function add(a: number, b: number): number {
 export function multiply(a: number, b: number): number {
   return a * b
 }
-EOF
+TSEOF
 
 git add utils/math.ts
 git commit -m "feat: add math utils - add + multiply (Commit A)"
 
-git push -u origin "$BRANCH"
+git push origin "${BRANCH}:${BRANCH}"
+
+# 保存分支名供 push-1.2-commit-b.sh 使用
+echo "$BRANCH" > /tmp/tester1-incremental-branch
 
 PR_URL=$(gh pr create \
   --title "[TEST 1.2] 增量审查验证" \

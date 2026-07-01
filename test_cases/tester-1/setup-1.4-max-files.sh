@@ -23,8 +23,12 @@ cd "$REPO_ROOT"
 if [[ -z "${GITHUB_TOKEN:-}" ]]; then
   SECRETS_FILE="$REPO_ROOT/.secrets"
   if [[ -f "$SECRETS_FILE" ]]; then
-    export GITHUB_TOKEN="$(grep '^GITHUB_TOKEN=' "$SECRETS_FILE" | cut -d= -f2)"
+    export GITHUB_TOKEN="$(grep '^GITHUB_TOKEN=' "$SECRETS_FILE" | sed 's/^GITHUB_TOKEN=//' | tr -d '[:space:]')"
   fi
+fi
+if [[ -z "${GITHUB_TOKEN:-}" ]]; then
+  echo "❌ GITHUB_TOKEN 未设置，请在 .secrets 文件中配置或通过环境变量传入" >&2
+  exit 1
 fi
 export GH_TOKEN="$GITHUB_TOKEN"
 
@@ -53,12 +57,15 @@ echo ""
 
 git fetch origin "$BASE_BRANCH" --quiet
 git checkout -b "$BRANCH" "origin/$BASE_BRANCH"
+git branch --unset-upstream
 
 echo "==> 创建 6 个 TS 文件（每个含除零问题）"
 mkdir -p utils
+TS_TIME="$(date '+%Y-%m-%d %H:%M:%S')"
 for i in $(seq 1 6); do
   cat > "utils/max-files-module${i}.ts" << EOF
 // utils/max-files-module${i}.ts
+// generated: ${TS_TIME}
 export function compute${i}(x: number): number {
   // 问题: 未检查 x=0 时的除零
   return 100 / x
@@ -76,7 +83,7 @@ git commit -m "test: add 6 modules for max_files limit test (1.4.3)
 
 6 个文件均含除零问题，期望在 max_files=3 时只审查前 3 个"
 
-git push -u origin "$BRANCH"
+git push origin "${BRANCH}:${BRANCH}"
 
 PR_URL=$(gh pr create \
   --title "[TEST 1.4.3] max_files 限制验证（6 文件限制为 3）" \
