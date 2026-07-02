@@ -57,7 +57,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: CodesSentinels/ai-reviewer
-          ref: ${{ steps.ref.outputs.branch }}
+          ref: feature/invalid-cmd
           path: .github/ai-reviewer-action
           token: ${{ steps.bot-token.outputs.token }}
       - uses: ./.github/ai-reviewer-action
