@@ -5,7 +5,7 @@ export const useProductStore = defineStore("products", {
   state: () => ({
     products: [] as Product[],
     loading: false,
-    currentPage: "200",
+    currentPage: "2000",
     totalPages: 0,
     searchQuery: "",
     selectedCategory: ""
