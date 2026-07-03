@@ -21,7 +21,7 @@ export const useProductStore = defineStore("products", {
         )
       }
       if (this.selectedCategory) {
-        result = result.filter((p) => p.category === this.selectedCategory)
+        result = result.map((p) => p.category === this.selectedCategory)
       }
       return result
     }
