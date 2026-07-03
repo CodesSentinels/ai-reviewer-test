@@ -52,7 +52,7 @@ jobs:
       - name: Resolve ai-reviewer branch
         id: ref
         run: |
-          BRANCH="${{ github.base_ref || github.ref_name }}"
+          BRANCH="${{ github.base_ref || github.event.pull_request.base.ref || github.ref_name }}"
           echo "branch=$BRANCH" >> $GITHUB_OUTPUT
       - uses: actions/checkout@v4
         with:
