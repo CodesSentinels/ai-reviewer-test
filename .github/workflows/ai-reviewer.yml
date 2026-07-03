@@ -97,7 +97,7 @@ jobs:
           openai_model_temperature: "0.0"
           openai_retries: 5
           openai_timeout_ms: 360000
-          openai_concurrency_limit: 6
+          openai_concurrency_limit: 3
           github_concurrency_limit: 6
 
           # ── AI Capabilities (Tool Use) ───────────────────────────
