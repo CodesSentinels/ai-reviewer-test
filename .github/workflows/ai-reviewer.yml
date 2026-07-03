@@ -6,10 +6,6 @@ permissions:
   issues: write
 
 on:
-  push:
-    branches:
-      - main
-      - "test/dev*"
   pull_request:
     types: [opened, synchronize, reopened]
   pull_request_review_comment:
@@ -48,16 +44,17 @@ jobs:
         with:
           node-version: "20"
       - uses: actions/checkout@v4
-      # 动态解析 ai-reviewer 分支：PR 取 base_ref，push 取 ref_name
-      - name: Resolve ai-reviewer branch
-        id: ref
-        run: |
-          BRANCH="${{ github.base_ref || github.ref_name }}"
-          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+      - name: Debug - Print all environment variables
+        env:
+          GITHUB_TOKEN: ${{ steps.bot-token.outputs.token }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: env | sort
+
+      # 指定 ai-reviewer 分支（测试完成后改回动态解析或 main）
       - uses: actions/checkout@v4
         with:
           repository: CodesSentinels/ai-reviewer
-          ref: feature/invalid-cmd
+          ref: fix/repeat-review
           path: .github/ai-reviewer-action
           token: ${{ steps.bot-token.outputs.token }}
       - uses: ./.github/ai-reviewer-action
@@ -100,7 +97,7 @@ jobs:
           openai_model_temperature: "0.0"
           openai_retries: 5
           openai_timeout_ms: 360000
-          openai_concurrency_limit: 6
+          openai_concurrency_limit: 3
           github_concurrency_limit: 6
 
           # ── AI Capabilities (Tool Use) ───────────────────────────
