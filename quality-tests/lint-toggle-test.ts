@@ -9,12 +9,11 @@ function callMissing() {
   return undeclaredFunction()
 }
 
-// tsc: TS2345 — direct string passed to number param (no cast bypass)
-function needsNumber(n: number): number {
-  return n * 2
+// tsc: TS2554 — wrong number of arguments (strict-independent)
+function greet(name: string, age: number): string {
+  return `${name} is ${age}`
 }
-// @ts-expect-error TS2345
-const res = needsNumber('text')
+const res = greet('Alice')
 
 // Biome: noExplicitAny
 export function anyType(x: any): any {
