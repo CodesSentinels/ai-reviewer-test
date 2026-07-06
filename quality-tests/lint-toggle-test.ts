@@ -3,16 +3,18 @@ import { readFileSync } from 'fs'
 // ESLint: no-unused-vars
 const unusedVar = 'never used'
 
-// ESLint: no-undef
+// ESLint: no-undef (intentional undeclared reference)
 function callMissing() {
-  return (globalThis as any).missingFunction()
+  // @ts-ignore
+  return undeclaredFunction()
 }
 
-// tsc: TS2345 类型不匹配
+// tsc: TS2345 — direct string passed to number param (no cast bypass)
 function needsNumber(n: number): number {
   return n * 2
 }
-const res = needsNumber('text' as any as number)
+// @ts-expect-error TS2345
+const res = needsNumber('text')
 
 // Biome: noExplicitAny
 export function anyType(x: any): any {
