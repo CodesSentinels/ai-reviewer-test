@@ -3,6 +3,13 @@ import { execSync } from 'child_process'
 import * as path from 'path'
 import * as fs from 'fs'
 
+// SQL 注入 — 触发 semgrep javascript.lang.security.audit.sqli
+import { createConnection } from 'mysql2'
+const db = createConnection({ host: 'localhost', user: 'root', database: 'app' })
+export function getUser(userId: string) {
+  db.query(`SELECT * FROM users WHERE id = '${userId}'`)
+}
+
 const app = express()
 app.use(express.json())
 
