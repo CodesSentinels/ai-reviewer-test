@@ -87,5 +87,6 @@ jobs:
             !dist/**
             !.output/**
           enable_lint_tools: true
+          enable_eslint: false
           enable_semgrep: true
           debug_resolve_inject_failures: "3"
