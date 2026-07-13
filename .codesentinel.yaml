@@ -1,0 +1,9 @@
+# CodeSentinel 项目级配置。ai-reviewer 在 Phase 0b 读取此文件决定启用哪些工具。
+tools:
+  eslint:
+    enabled: true
+    useProjectConfig: true
+  biome:
+    enabled: true
+  prettier:
+    enabled: false

@@ -1,0 +1,22 @@
+{
+  "name": "ai-reviewer-test-baseline",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Baseline Nuxt/Vue + TS project for CodeSentinel AI Reviewer testing",
+  "type": "module",
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "nuxt": "^3.13.0",
+    "vue": "^3.5.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.3.0",
+    "eslint": "^9.15.0",
+    "typescript": "^5.6.0"
+  }
+}
