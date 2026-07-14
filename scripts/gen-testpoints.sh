@@ -99,6 +99,7 @@ if want A; then
   D="$BASE/A-basic-review"
 
   write_file "$D/insecure-handler.ts" << 'EOF'
+// 目标路径: server/api/request-handler.ts（把本文件拷到基线的此路径后提交）
 // 域 A 测试文件：故意植入多类问题，触发四阶段审查 + 行级评论。
 // 预期 Bot 指出：SQL 注入 / eval / 未 await / 循环内建正则。
 export function handleRequest(req: any, res: any) {
@@ -153,7 +154,8 @@ EOF
 
   hr
   echo "域 A 操作指引："
-  echo "  A1 自动触发    : 从基准分支拉 feature 分支，提交 $D/insecure-handler.ts → 建 PR，等 1~3 分钟"
+  echo "  放置: insecure-handler.ts → server/api/request-handler.ts"
+  echo "  A1 自动触发    : 从基准分支拉 feature 分支，把上面文件拷到目标路径 → 建 PR，等 1~3 分钟"
   echo "  A2 摘要格式    : 检查 Bot 首条评论含 Walkthrough + Changes 表格"
   echo "  A3 行级评论定位: 对比评论行号与 insecure-handler.ts 中问题行（±2 行内）"
   echo "  A4 发布说明    : PR 描述末尾应出现 'Summary by CodeSentinel'"
@@ -170,6 +172,7 @@ if want B; then
   D="$BASE/B-incremental"
 
   write_file "$D/step1-math.ts" << 'EOF'
+// 目标路径: utils/math.ts（第 1 次提交：拷到此路径后 push 触发首次审查）
 // 域 B 第 1 次提交：先 push 触发首次审查。
 export function add(a: number, b: number): number {
   return a + b
@@ -181,7 +184,8 @@ export function multiply(a: number, b: number): number {
 EOF
 
   write_file "$D/step2-math-append.ts" << 'EOF'
-// 域 B 第 2 次提交：在 Bot 审完 step1 后，把这些函数【追加】到 step1-math.ts，
+// 目标路径: utils/math.ts（第 2 次提交：把本文件内容【追加】到 utils/math.ts 末尾）
+// 域 B 第 2 次提交：在 Bot 审完 step1 后，把这些函数【追加】到 utils/math.ts，
 // 再 push。预期 Bot 仅评论 divide/power，不重复评论 add/multiply。
 export function divide(a: number, b: number): number {
   return a / b // 问题：未检查除零
@@ -198,7 +202,8 @@ EOF
 
   hr
   echo "域 B 操作指引："
-  echo "  B1 增量 diff   : 提交 step1-math.ts → 建 PR → 等审查完 → 把 step2 内容追加到同文件 → 再 push"
+  echo "  放置: step1-math.ts → utils/math.ts；step2-math-append.ts → 追加到 utils/math.ts 末尾"
+  echo "  B1 增量 diff   : 提交 utils/math.ts(step1) → 建 PR → 等审查完 → 把 step2 追加到同文件 → 再 push"
   echo "                   预期：第二次评论仅针对 divide/power，不重复 add/multiply"
   echo "  B2 已审 commit : 检查摘要评论 HTML 隐藏标签含 <!-- commit_ids_reviewed -->，列出已审 SHA"
   echo "  B3 full review : 在已审 PR 评论区发 '@codesentinel full review' → 覆盖 base..HEAD 全部变更"
@@ -213,6 +218,7 @@ if want C; then
   D="$BASE/C-file-filter"
 
   write_file "$D/keep/version.ts" << 'EOF'
+// 目标路径: utils/version.ts
 // 应被审查：匹配 path_filters 的 **/*.ts
 export const VERSION = '1.0.0'
 
@@ -222,12 +228,13 @@ export function bug(x: number): number {
 EOF
 
   write_file "$D/skip/styles.css" << 'EOF'
-/* 应被过滤：.css 不在 path_filters 白名单中，Bot 不应审查此文件 */
+/* 目标路径: assets/styles.css —— 应被过滤：.css 不在 path_filters 白名单中，Bot 不应审查 */
 .button { color: #f00; }
 EOF
 
+  # data.json 目标路径: config/data.json（JSON 不支持注释，路径见下方对照表 / 指引）
   write_file "$D/skip/data.json" << 'EOF'
-{ "note": "应被过滤：*.json 在默认黑名单中，不应被审查" }
+{ "note": "目标路径 config/data.json；应被过滤：*.json 在默认黑名单中，不应被审查" }
 EOF
 
   write_file "$D/gen-many-files.sh" << 'EOF'
@@ -249,7 +256,8 @@ EOF
 
   hr
   echo "域 C 操作指引："
-  echo "  C1 二进制排除 : PR 同时含图片(.png)与 keep/version.ts → 仅 TS 被审查"
+  echo "  放置: keep/version.ts → utils/version.ts；skip/styles.css → assets/styles.css；skip/data.json → config/data.json"
+  echo "  C1 二进制排除 : PR 同时含图片(.png)与 utils/version.ts → 仅 TS 被审查"
   echo "  C2 path 过滤  : 提交 skip/styles.css + skip/data.json + keep/version.ts → 仅 version.ts 出现在审查中"
   echo "  C3 max_files  : 运行 $D/gen-many-files.sh，临时设 workflow max_files: 3 → 摘要显示只审 3 个、记录跳过"
   echo "  C4 lock 排除  : PR 含 pnpm-lock.yaml/package-lock.json 变更 → lock 文件不出现在审查中"
@@ -334,6 +342,7 @@ if want E; then
   D="$BASE/E-commands"
 
   write_file "$D/command-anchor.ts" << 'EOF'
+// 目标路径: utils/command-anchor.ts
 // 域 E：含问题的代码，先让 Bot 产出行级评论，供 resolve 命令批量解决。
 export function unsafeQuery(table: string, id: string): string {
   return `SELECT * FROM ${table} WHERE id = '${id}'` // SQL 注入
@@ -388,7 +397,8 @@ EOF
 
   hr
   echo "域 E 操作指引："
-  echo "  1. 提交 command-anchor.ts 建 PR，等 Bot 产出行级评论"
+  echo "  放置: command-anchor.ts → utils/command-anchor.ts（command-sequence.md 仅为命令清单，不入库）"
+  echo "  1. 把 command-anchor.ts 拷到 utils/ 建 PR，等 Bot 产出行级评论"
   echo "  2. 按 $D/command-sequence.md 在 PR 评论区依次执行命令序列"
   echo "  3. E2/E8 需两个不同权限的账号；限流(E10)与幂等(E11)需连发/重跑观察"
   echo ""
@@ -402,6 +412,7 @@ if want F; then
   D="$BASE/F-conversation-noise"
 
   write_file "$D/conversation-anchor.ts" << 'EOF'
+// 目标路径: utils/payment.ts
 // 域 F 对话锚点：设计为「值得追问」的问题，供 3.1 对话测试。
 export function processPayment(amount: number, userId: string) {
   if (amount) {
@@ -414,6 +425,7 @@ declare function executeQuery(q: string): unknown
 EOF
 
   write_file "$D/quality-mixed-severity.ts" << 'EOF'
+// 目标路径: utils/quality-issues.ts
 // 域 F 噪音控制：混合各严重级别 + 同类重复（Math.random×5）验证合并/排序/截断。
 import {readFileSync} from 'fs'
 
@@ -464,6 +476,7 @@ export function unusedImportDemo() {
 EOF
 
   write_file "$D/dedup-scenarios.ts" << 'EOF'
+// 目标路径: utils/dedup-scenarios.ts
 // 域 F AI 评论去重：连续同类违规应合并；不同类违规应各自保留。
 export function processItems(items: string[]) {
   var item1 = items[0] // no-var（连续 5 行，应合并）
@@ -495,7 +508,9 @@ EOF
 
   hr
   echo "域 F 操作指引："
-  echo "  F-噪音(3.3): 提交 quality-mixed-severity.ts → 检查级别徽标(🚨严重/⚠️主要/📝建议/💡微调)、"
+  echo "  放置: conversation-anchor.ts → utils/payment.ts；quality-mixed-severity.ts → utils/quality-issues.ts；"
+  echo "        dedup-scenarios.ts → utils/dedup-scenarios.ts（conversation-sequence.md 仅为追问清单，不入库）"
+  echo "  F-噪音(3.3): 提交 utils/quality-issues.ts → 检查级别徽标(🚨严重/⚠️主要/📝建议/💡微调)、"
   echo "               critical 排前、评论数 ≤ max_review_comments(20)、Math.random×5 被合并"
   echo "  F-去重(3.5): 提交 dedup-scenarios.ts → 连续 no-var 合并为 1 条，eval/console/eqeqeq 各自保留"
   echo "  F-对话(3.1): 等 conversation-anchor.ts 产出行级评论后，按 conversation-sequence.md 在 thread 追问"
@@ -511,6 +526,7 @@ if want G; then
   D="$BASE/G-lint-sast"
 
   write_file "$D/lint-violations.ts" << 'EOF'
+// 目标路径: utils/lint-violations.ts
 // 域 G：触发 ESLint / tsc / Biome 多工具。预期 Bot 评论引用工具规则 + 底部「🧰 Tools」卡片。
 import {readFileSync} from 'fs'
 
@@ -540,6 +556,7 @@ void readFileSync
 EOF
 
   write_file "$D/security-semgrep.ts" << 'EOF'
+// 目标路径: server/api/insecure-endpoints.ts
 // 域 G（G7 Semgrep）：需 workflow 设 enable_semgrep: true。
 // 预期 Bot 评论引用 Semgrep 规则 ID（注入 / XSS 等）。
 import express from 'express'
@@ -561,7 +578,8 @@ EOF
 
   hr
   echo "域 G 操作指引（依赖基线含 eslint.config.js / biome.json / tsconfig.json）："
-  echo "  G1 ESLint     : 提交 lint-violations.ts → 评论引用 ESLint 规则名"
+  echo "  放置: lint-violations.ts → utils/lint-violations.ts；security-semgrep.ts → server/api/insecure-endpoints.ts"
+  echo "  G1 ESLint     : 提交 utils/lint-violations.ts → 评论引用 ESLint 规则名"
   echo "  G2 tsc        : 评论引用 TypeScript 错误码（如 TS2304 / TS2345）"
   echo "  G3 Biome      : 评论引用 Biome 规则（noExplicitAny / useConst）"
   echo "  G4 归因卡片   : 行级评论底部含「🧰 Tools」段落，列出参与工具"
@@ -579,6 +597,7 @@ if want H; then
   D="$BASE/H-websearch-shell"
 
   write_file "$D/websearch-trigger.ts" << 'EOF'
+// 目标路径: utils/crypto-helper.ts
 // 域 H：使用较新/冷门 API，诱导模型联网核实用法。
 // 预期 Analysis chain 中出现 web_search 步骤（enable_web_search: true 时）。
 export async function deriveKey(password: string): Promise<CryptoKey> {
@@ -605,6 +624,7 @@ export function usesAbortTimeout(url: string): Promise<Response> {
 EOF
 
   write_file "$D/shell-trigger.ts" << 'EOF'
+// 目标路径: utils/diagnostic.ts
 // 域 H：含依赖/版本相关问题的代码，诱导模型请求执行 shell 辅助分析。
 // 预期 Analysis chain 中出现 shell 步骤（enable_shell: true 时）。
 import {exec} from 'child_process'
@@ -622,7 +642,8 @@ EOF
 
   hr
   echo "域 H 操作指引（需查看 GitHub Actions 运行日志确认）："
-  echo "  H1 Web 搜索   : 提交 websearch-trigger.ts → Analysis chain / 日志含 web_search 步骤"
+  echo "  放置: websearch-trigger.ts → utils/crypto-helper.ts；shell-trigger.ts → utils/diagnostic.ts"
+  echo "  H1 Web 搜索   : 提交 utils/crypto-helper.ts → Analysis chain / 日志含 web_search 步骤"
   echo "  H2 Shell 执行 : 提交 shell-trigger.ts → 日志含 shell 调用记录"
   echo "  H3 关闭 web   : 临时设 enable_web_search: false → 日志无 [web_search_debug]"
   echo "  H4 关闭 shell : 临时设 enable_shell: false → 日志无 shell 调用"
@@ -634,10 +655,28 @@ echo "============================================================="
 echo "  ✅ 测试点代码已生成到 $BASE/"
 echo "============================================================="
 echo ""
+echo "文件放置对照（test_cases 为暂存区，需按此表拷到基线项目的目标路径）："
+echo "  A  insecure-handler.ts      → server/api/request-handler.ts"
+echo "  B  step1-math.ts            → utils/math.ts；step2 追加到 utils/math.ts 末尾"
+echo "  C  keep/version.ts          → utils/version.ts"
+echo "  C  skip/styles.css          → assets/styles.css（应被过滤）"
+echo "  C  skip/data.json           → config/data.json（应被过滤）"
+echo "  D  CHANGE-formatPrice.ts    → 替换 utils/formatPrice.ts"
+echo "  D  CHANGE-useCart.ts        → 替换 composables/useCart.ts"
+echo "  E  command-anchor.ts        → utils/command-anchor.ts"
+echo "  F  conversation-anchor.ts   → utils/payment.ts"
+echo "  F  quality-mixed-severity.ts→ utils/quality-issues.ts"
+echo "  F  dedup-scenarios.ts       → utils/dedup-scenarios.ts"
+echo "  G  lint-violations.ts       → utils/lint-violations.ts"
+echo "  G  security-semgrep.ts      → server/api/insecure-endpoints.ts"
+echo "  H  websearch-trigger.ts     → utils/crypto-helper.ts"
+echo "  H  shell-trigger.ts         → utils/diagnostic.ts"
+echo "  （*.md / *-sequence.md / gen-many-files.sh 仅为指引与辅助脚本，不入库）"
+echo ""
 echo "通用执行流程（每个域都适用）："
 echo "  1. git checkout <基准分支> && git pull"
 echo "  2. git checkout -b test/<域>-\$(date +%m%d)"
-echo "  3. 按各域指引复制/替换文件（域 D/F 需替换基线文件；域 B 需两次提交）"
+echo "  3. 按上方对照表复制/替换文件（域 D 替换基线文件；域 B 需两次提交）"
 echo "  4. git add -A && git commit && git push -u origin <分支>"
 echo "  5. gh pr create --base <基准分支> ...（或在网页建 PR）"
 echo "  6. 等 1~3 分钟，按指引与 scripts/TEST-POINTS.md 核对 Bot 行为"

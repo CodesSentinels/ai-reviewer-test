@@ -37,6 +37,31 @@
 | 等待时间 | 首次审查 1~3 分钟；增量审查约 1 分钟 |
 | 需改配置的用例 | A5 / C3 / D4 / D5 / F-截断 / G5 / G6 / G7 / H3 / H4（测完恢复） |
 
+### 文件放置对照表
+
+`gen-testpoints.sh` 把代码写入 `test_cases/<域>/` **暂存区**；提交前需按下表拷贝/替换到基线项目的**目标路径**（每个生成文件头部也有 `目标路径:` 注释）。`.md` 指引文件与 `gen-many-files.sh` 不入库。
+
+| 域 | 暂存文件 | 目标路径 | 说明 |
+| :-: | :--- | :--- | :--- |
+| A | `insecure-handler.ts` | `server/api/request-handler.ts` | 新增 |
+| B | `step1-math.ts` | `utils/math.ts` | 第 1 次提交 |
+| B | `step2-math-append.ts` | `utils/math.ts`（追加末尾） | 第 2 次提交 |
+| C | `keep/version.ts` | `utils/version.ts` | 应被审查 |
+| C | `skip/styles.css` | `assets/styles.css` | 应被过滤 |
+| C | `skip/data.json` | `config/data.json` | 应被过滤 |
+| D | `CHANGE-formatPrice.ts` | 替换 `utils/formatPrice.ts` | 改基线 |
+| D | `CHANGE-useCart.ts` | 替换 `composables/useCart.ts` | 改基线 |
+| E | `command-anchor.ts` | `utils/command-anchor.ts` | 新增 |
+| F | `conversation-anchor.ts` | `utils/payment.ts` | 新增 |
+| F | `quality-mixed-severity.ts` | `utils/quality-issues.ts` | 新增 |
+| F | `dedup-scenarios.ts` | `utils/dedup-scenarios.ts` | 新增 |
+| G | `lint-violations.ts` | `utils/lint-violations.ts` | 新增 |
+| G | `security-semgrep.ts` | `server/api/insecure-endpoints.ts` | 新增 |
+| H | `websearch-trigger.ts` | `utils/crypto-helper.ts` | 新增 |
+| H | `shell-trigger.ts` | `utils/diagnostic.ts` | 新增 |
+
+> 域 D 是**替换**基线已有文件（依赖基线引用图）；域 B 需在同一文件上分两次提交；其余域为**新增**文件。
+
 ### 关键常量与默认值
 
 | 常量 | 值 | 来源 |
