@@ -9,7 +9,7 @@ on:
   push:
     branches:
       - main
-      - 'test/dev*'
+      - "test/dev*"
   pull_request:
     types: [opened, synchronize, reopened]
   pull_request_review_comment:
@@ -47,17 +47,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-      - uses: actions/checkout@v4
-      # 动态解析 ai-reviewer 分支：PR 取 base_ref，push 取 ref_name
-      - name: Resolve ai-reviewer branch
-        id: ref
-        run: |
-          BRANCH="${{ github.base_ref || github.ref_name }}"
-          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+      # 固定使用 ai-reviewer 的 main 分支作为 action 源码
       - uses: actions/checkout@v4
         with:
           repository: CodesSentinels/ai-reviewer
-          ref: ${{ steps.ref.outputs.branch }}
+          ref: main
           path: .github/ai-reviewer-action
           token: ${{ steps.bot-token.outputs.token }}
       - uses: ./.github/ai-reviewer-action
