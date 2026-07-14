@@ -20,6 +20,11 @@ on:
 concurrency:
   # Bot-triggered events (e.g. the ACK comment from resolve) get a unique group
   # per run so they never cancel the human-triggered resolve run.
+  #
+  # Comment events key on comment.id so that rapid consecutive comments on the
+  # same PR each get their own group and run in parallel — otherwise they share
+  # one group and, with cancel-in-progress disabled, a queued run is evicted
+  # (skipped) by the next comment. Non-comment events fall back to 'pr'.
   group: >-
     ${{ github.event.sender.type == 'Bot'
         && format('bot-noop-{0}', github.run_id)
@@ -27,7 +32,7 @@ concurrency:
              github.repository,
              github.event.number || github.head_ref || github.sha,
              github.workflow,
-             github.event_name == 'pull_request_review_comment' && 'pr_comment' || 'pr') }}
+             github.event.comment.id || 'pr') }}
   cancel-in-progress: ${{ github.event_name != 'pull_request_review_comment' }}
 
 jobs:
