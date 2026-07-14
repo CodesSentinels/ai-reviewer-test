@@ -1,0 +1,2 @@
+/* 目标路径: assets/styles.css —— 应被过滤：.css 不在 path_filters 白名单中，Bot 不应审查 */
+.button { color: #f00; }

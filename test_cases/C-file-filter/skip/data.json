@@ -1,0 +1,1 @@
+{ "note": "目标路径 config/data.json；应被过滤：*.json 在默认黑名单中，不应被审查" }
