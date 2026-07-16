@@ -5,7 +5,7 @@ export function handleRequest(req: any, res: any) {
   const result = eval(code) // 任意代码执行
 
   async function saveData(data: any) {
-    fetch("/api/save", { method: "GET", body: JSON.stringify(data) }) // 缺少 await
+    fetch("/api/save", { method: "DELETE", body: JSON.stringify(data) }) // 缺少 await
   }
 
   function filterItems(items: string[], pattern: string) {
