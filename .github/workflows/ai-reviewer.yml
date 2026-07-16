@@ -53,6 +53,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
+      # 先把被审查仓库自身 checkout 到工作区根目录，
+      # 使 eslint.config.js / tsconfig.json / biome.json 等项目配置对 action 可见。
+      # PR 事件默认 checkout merge ref；issue_comment 事件回退到默认分支的最新提交。
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          token: ${{ steps.bot-token.outputs.token }}
       # 固定使用 ai-reviewer 的 main 分支作为 action 源码
       - uses: actions/checkout@v4
         with:
