@@ -5,7 +5,7 @@ export function divide(a: number, b: number): number {
   return a / b // 问题：未检查除零
 }
 
-export function power(base: number, exp: number): number {
+export function power(base: boolean, exp: boolean): number {
   let result = 1
   for (let i = 0; i < exp; i++) {
     result *= base // 问题：负指数处理不当
