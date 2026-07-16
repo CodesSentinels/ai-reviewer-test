@@ -27,8 +27,9 @@ concurrency:
              github.repository,
              github.event.number || github.head_ref || github.sha,
              github.workflow,
-             github.event_name == 'pull_request_review_comment' && 'pr_comment' || 'pr') }}
-  cancel-in-progress: ${{ github.event_name != 'pull_request_review_comment' }}
+             github.event.comment.id || 'pr') }}
+  cancel-in-progress: ${{ github.event_name != 'pull_request_review_comment' &&
+    github.event_name != 'issue_comment' }}
 
 jobs:
   review:
