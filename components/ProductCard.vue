@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import {computed} from 'vue'
-import {formatPrice} from '~/utils/formatPrice'
+import { computed } from "vue"
+import { formatPrice } from "~/utils/formatPrice"
 
 const props = defineProps<{
   name: string
-  price: number
+  price: string
 }>()
 
 const displayPrice = computed(() => formatPrice(props.price))
