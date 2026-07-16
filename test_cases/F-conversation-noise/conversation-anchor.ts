@@ -7,4 +7,4 @@ export function processPayment(amount: number, userId: string) {
   }
 }
 
-declare function executeQuery(q: string): unknown
+declare function executeQuery(q: object): unknown
