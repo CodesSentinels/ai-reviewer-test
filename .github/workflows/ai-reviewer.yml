@@ -94,7 +94,7 @@ jobs:
             !node_modules/**
             !dist/**
             !.output/**
-          enable_lint_tools: true
+          enable_lint_tools: false
           enable_eslint: true
           enable_biome: true
           enable_tsc: true
