@@ -94,11 +94,11 @@ jobs:
             !dist/**
             !.output/**
           enable_lint_tools: true
-          enable_eslint: false
+          enable_eslint: true
           enable_biome: true
-          enable_tsc: false
-          enable_prettier: false
-          enable_semgrep: false
+          enable_tsc: true
+          enable_prettier: true
+          enable_semgrep: true
           eslint_version: "^9.15.0"
           biome_version: "^2.3.0"
           tsc_version: "^5.6.0"
