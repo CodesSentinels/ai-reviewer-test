@@ -94,7 +94,7 @@ jobs:
             !dist/**
             !.output/**
           enable_lint_tools: true
-          enable_eslint: false
+          enable_eslint: true
           enable_biome: false
           enable_tsc: false
           enable_prettier: false
