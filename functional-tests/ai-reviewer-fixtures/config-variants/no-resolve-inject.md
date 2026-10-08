@@ -5,14 +5,14 @@
 
 ## 修改内容
 
-基线保留 `debug_resolve_inject_failures: "3"`（resolve 时追加 3 个假 thread ID，产生 ok=真实数 failed=3 的受控部分失败）。若它干扰了 FT-113~115 的判定，用本变体重测：
+基线保留 `debug_resolve_inject_failures: "3"`。注意：在锁定 SHA `8c84f45f` 处 `src/commands/handlers/resolve.ts` 里的注入代码已被注释掉，该输入**不生效**，resolve 输出不会出现 failed=3；本变体通常不需要使用，仅在未来 SHA 恢复注入逻辑时才有意义：
 
 ```diff
 -          debug_resolve_inject_failures: "3"
 +          debug_resolve_inject_failures: "0"
 ```
 
-预期：resolve 输出不再有 failed=3。FT-061（部分失败可解释）应在基线下判定，不要在本变体下判定。
+预期：resolve 输出不再有 failed=3（锁定 SHA 下本来就没有）。
 
 ## 还原
 

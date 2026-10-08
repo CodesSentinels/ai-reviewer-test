@@ -45,7 +45,7 @@ FT-057	陈旧事件安全跳过	multi-phase	stale-head	1,2	generate_incremental	
 FT-058	修改回退后状态一致	multi-phase	revert	2,3	generate_revert	FT-051	phase2-run,phase3-run,summary	e2e	baseline	none	author	no	4	-	yes	no
 FT-059	full review 执行全量审查	manual-command	incremental	command	print_command_steps	FT-010	command-comment,workflow-log	e2e	baseline	none	author	no	1	-	yes	no
 FT-060	summary 只重建摘要	manual-command	incremental	command	print_command_steps	FT-010	command-comment,summary-edit-history	e2e	baseline	none	author	no	1	-	yes	no
-FT-061	部分评论失败时状态可解释	manual-command	incremental	command	print_command_steps	FT-010	command-comment,reply-text	e2e	baseline	none	write	no	1	FT-113	yes	no
+FT-061	部分评论失败时状态可解释	manual-command	incremental	command	print_command_steps	FT-010	command-comment,reply-text	needs-injection	baseline	resolve-partial-failure	write	no	1	FT-113	yes	no
 FT-062	异常以失败状态退出	external-observation	incremental	1	print_observation_steps	none	workflow-log,unit-test	unit-evidence	baseline	force-exception	none	no	1	-	yes	no
 FT-070	`@ai-reviewer: ignore` 跳过审查	external-observation	filter	command	print_observation_steps	FT-010	pr-description,workflow-log	e2e	baseline	none	author	no	0	-	yes	no
 FT-071	移除 ignore 后恢复审查	external-observation	filter	command	print_observation_steps	FT-010	pr-description,workflow-log	e2e	baseline	none	author	no	0	-	yes	no
