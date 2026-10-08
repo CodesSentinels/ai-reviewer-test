@@ -18,14 +18,14 @@
 - baseline_profile: secure(shell=false, lint=false)
 - isolated_env: pending
 - current_stage: PHASE1_SUBMITTED
-- last_updated: 2026-10-08T08:30:00Z
-- last_updated_by_step: 读取 full review 的 run：发现评论类事件用了 main 的 workflow，结果不能作为 develop SHA 证据；FT-011 PASS；等待用户把基线 workflow 合入 main
+- last_updated: 2026-10-08T09:00:00Z
+- last_updated_by_step: 第二次 full review 的 run 仍跑在 ai-reviewer main 上（main 的 workflow 已关 shell/lint、删 md，但缺少 SHA 固定）；等待用户把 SHA 固定合入 main
 
 ## 下一步（Next Actions）
 
-1. 用户：把基线 workflow 合入 `main`。原因：`issue_comment` / `pull_request_review_comment` 事件使用默认分支（main）的 workflow，上一次 `@ai-reviewer full review` 实际跑的是 main 的旧配置（ai-reviewer 取 main 分支、shell/lint 开启、md 仍被审查），不能作为 develop SHA 的证据。做法：另开一个只改 `.github/workflows/ai-reviewer.yml` 的小 PR（固定 SHA、shell=false、lint=false、删除 `**/*.md`）合入 main。完成判定：`main` 上的 ai-reviewer.yml 含锁定 SHA。
-2. 用户：合入后在 PR #300 重新发布 `@ai-reviewer full review`（同时覆盖 FT-059 / FT-105），等 run 完成后把链接发给 Claude。注意先确认该 run 的 headSha 是 main 的新提交，且日志里 ai-reviewer 的 checkout ref 为锁定 SHA。
-3. Claude：读取该 run，重新判定 FT-030~036、FT-091、FT-094、FT-172~174、FT-179、FT-014、FT-052、FT-059、FT-105 等（预期可审查文件约 30 个，不再被 max_files 截断）。
+1. 用户：把“固定 SHA”合入 `main` 的 `.github/workflows/ai-reviewer.yml`。现状：main 上已有 `enable_shell: false`、`enable_lint_tools: false`、无 `**/*.md`，但仍保留 `Resolve ai-reviewer branch` 步骤和 `ref: ${{ steps.ref.outputs.branch }}`，所以评论触发的 run 取的是 ai-reviewer 的 `main` 分支（[run 37752372756](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37752372756) 日志 `BRANCH="main"`、`ref: main`），不是锁定的 develop SHA。做法：让 main 上的该文件与测试分支一致——删除 `Resolve ai-reviewer branch` 步骤，ai-reviewer 的 checkout 改为 `ref: 8c84f45fab547821ecefbf56aabbf215eb9d7dbf`（`git diff origin/main -- .github/workflows/ai-reviewer.yml` 现在就只剩这一处差异）。完成判定：`main` 上的该文件含锁定 SHA。
+2. 用户：合入后第三次发布 `@ai-reviewer full review`，等 run 完成后把链接发给 Claude。Claude 会先核对日志里 ai-reviewer 的 checkout ref 是锁定 SHA，再判定。
+3. Claude：读取该 run，判定 FT-030~036、FT-091、FT-094、FT-172~174、FT-179、FT-014、FT-052、FT-059、FT-105 等。
 4. 用户：Phase 1 重审通过后，`--phase 2 --dry-run` → `--phase 2` → 检查增量 diff → 提交推送 → 把 commit / run 链接发给 Claude。
 5. 用户（可并行）：确认基线偏差表，回答是否提供隔离环境。
 
@@ -395,6 +395,7 @@
 
 ## 变更日志（倒序，只追加）
 
+- 2026-10-08T09:00:00Z：用户把基线部分合入 main（commit eff0435：shell/lint 关闭、删除 md）后第二次发布 full review。读取 [run 37752372756](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37752372756)：success，但日志 `BRANCH="main"`、`ref: main`，ai-reviewer 取的是 main 分支而非锁定 SHA（main 的 workflow 仍有 Resolve ai-reviewer branch 步骤）；因此不作为 develop 证据。参考性观察：该 run 审查了 17 个文件，包含 workspace 夹具，delivered 9 条评论（session.ts、pricing.ts、aggregate.ts、inventory.ts、lint 文件、nits.ts 等），说明 md 排除后夹具能进入审查范围；PR 另有 commit 803b07c9（pull_request 事件的 run 37752133346 成功，使用 PR 的 workflow）。原因：用户报告 full review 执行完。
 - 2026-10-08T08:30:00Z：用户推送 commit 70a69dff（删除 `**/*.md`）并在 PR 评论 `@ai-reviewer full review`。读取两个 run：[37745413862](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37745413862)（pull_request / synchronize，固定 SHA，只含被排除路径→跳过，FT-011 PASS）、[37745545033](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37745545033)（issue_comment，用了 main 的旧 workflow：ai-reviewer main、shell/lint true、md 仍审查，delivered 10 条评论，本地 shell 被执行）。后者不作为 develop 证据；原因：用户报告 full review 执行完。
 - 2026-10-08T08:05:00Z：用户决定 md 文档不审查；在 `ai-reviewer.yml` 的 `path_filters` 删除 `**/*.md`（基线第 4 处改动，未提交），同步更新 baseline.md / README / 报告模板；原因：首轮 run 因 max_files=150 截断，workspace 夹具未被审查。
 - 2026-10-08T07:45:00Z：读取 PR #300 首轮 run（37742626690，约 6m14s，成功）。判定 PASS 22 项、SUBMITTED 17 项；发现 max_files=150 截断导致 workspace 夹具未被审查（测试设计问题）；更新 Issue #299；原因：用户提供 PR URL。
