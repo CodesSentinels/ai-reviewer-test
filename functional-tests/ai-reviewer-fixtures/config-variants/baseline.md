@@ -14,4 +14,6 @@
 
 依据：ai-reviewer 生产 workflow `.github/workflows/openai-review.yml` 与验收文档 `docs/github-only-acceptance-checklist.md` 均采用 shell/lint 关闭；本地 lint 仅适用于无业务密钥的执行面（`src/review.ts`）。
 
+**重要：** GitHub 对 `issue_comment`、`pull_request_review_comment` 事件使用**默认分支（main）上的 workflow**。命令类用例（G/H/I 分区、FT-059/060/061/105/106 等）要先把上述基线 workflow 合入 `main`，否则实际运行的是 main 的旧配置和 ai-reviewer 的 main 分支，证据无效。`pull_request` 事件使用 PR 自己的 workflow，不受影响。
+
 基线中保持不变、但会影响部分用例的现状：`debug: true`、`enable_web_search: true`、`enable_semgrep: true`（总开关关闭，预期不生效）、`debug_resolve_inject_failures: "3"`、`setup-node` 的 node 20（只影响 job 的 Node，不影响 action 的 `runs.using: node24`）。

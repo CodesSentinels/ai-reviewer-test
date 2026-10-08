@@ -1104,6 +1104,9 @@ execute_case() {
       set_result "$sr" ;;
     print_*)
       say "-- 仅打印步骤（脚本不会发布评论、不会触发 workflow、不会更新 Issue）--"
+      if [ "$C_TYPE" = "manual-command" ]; then
+        say "前置提醒: 评论触发的事件（issue_comment / pull_request_review_comment）使用 main 上的 workflow；请先确认基线 workflow 已合入 main，并在 run 日志中核对 ai-reviewer 的 checkout ref 为锁定 SHA，否则证据无效。"
+      fi
       print_case_footer
       if [ "$C_BM" = "no" ] && [ "${AI_REVIEWER_TEST_ISOLATED_ENV:-}" != "provided" ]; then
         say "该用例需要无业务密钥的隔离环境（config-variants/${C_VARIANT}.md）；未声明 AI_REVIEWER_TEST_ISOLATED_ENV=provided，视为未提供。"

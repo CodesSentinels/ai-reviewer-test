@@ -18,14 +18,14 @@
 - baseline_profile: secure(shell=false, lint=false)
 - isolated_env: pending
 - current_stage: PHASE1_SUBMITTED
-- last_updated: 2026-10-08T08:05:00Z
-- last_updated_by_step: 用户决定 md 不审查；已修改 ai-reviewer.yml（删除 `**/*.md`），等待用户提交推送并发 full review
+- last_updated: 2026-10-08T08:30:00Z
+- last_updated_by_step: 读取 full review 的 run：发现评论类事件用了 main 的 workflow，结果不能作为 develop SHA 证据；FT-011 PASS；等待用户把基线 workflow 合入 main
 
 ## 下一步（Next Actions）
 
-1. 用户：检查并提交 `.github/workflows/ai-reviewer.yml`（基线第 4 处改动：`path_filters` 删除 `**/*.md`，用户已决定 md 文档不审查）和本进度文档的改动，推送到测试分支。完成判定：PR #300 出现新 commit。
-2. 用户：在 PR #300 评论区发布 `@ai-reviewer full review`（同时覆盖 FT-059 / FT-105），等 run 完成后把 run / 评论链接发给 Claude。注意：这次推送会先触发一次 synchronize 的增量审查（只含 workflow 改动），属预期；以 full review 的 run 为 Phase 1 的审查证据。
-3. Claude：读取 full review 的 run 与评论，重新判定 FT-030~036、FT-091、FT-094、FT-172~174、FT-179 等；预期可审查文件数降到约 30 个，不再被 `max_files=150` 截断。
+1. 用户：把基线 workflow 合入 `main`。原因：`issue_comment` / `pull_request_review_comment` 事件使用默认分支（main）的 workflow，上一次 `@ai-reviewer full review` 实际跑的是 main 的旧配置（ai-reviewer 取 main 分支、shell/lint 开启、md 仍被审查），不能作为 develop SHA 的证据。做法：另开一个只改 `.github/workflows/ai-reviewer.yml` 的小 PR（固定 SHA、shell=false、lint=false、删除 `**/*.md`）合入 main。完成判定：`main` 上的 ai-reviewer.yml 含锁定 SHA。
+2. 用户：合入后在 PR #300 重新发布 `@ai-reviewer full review`（同时覆盖 FT-059 / FT-105），等 run 完成后把链接发给 Claude。注意先确认该 run 的 headSha 是 main 的新提交，且日志里 ai-reviewer 的 checkout ref 为锁定 SHA。
+3. Claude：读取该 run，重新判定 FT-030~036、FT-091、FT-094、FT-172~174、FT-179、FT-014、FT-052、FT-059、FT-105 等（预期可审查文件约 30 个，不再被 max_files 截断）。
 4. 用户：Phase 1 重审通过后，`--phase 2 --dry-run` → `--phase 2` → 检查增量 diff → 提交推送 → 把 commit / run 链接发给 Claude。
 5. 用户（可并行）：确认基线偏差表，回答是否提供隔离环境。
 
@@ -54,7 +54,7 @@
 
 ## FT 状态总表
 
-汇总：共 226 项；PASS 22 / FAIL 0 / BLOCKED 0 / N/A 0 / 其余 204（NOT_READY 187、SUBMITTED 17）。
+汇总：共 226 项；PASS 23 / FAIL 0 / BLOCKED 0 / N/A 0 / 其余 203（NOT_READY 186、SUBMITTED 17）。
 
 ### A. 环境与启动
 
@@ -75,7 +75,7 @@
 | FT | 标题 | type | coverage | baselineMeaningful | 隔离环境 | 状态 | 证据链接 | 缺陷 Issue | 最后更新 | 备注 |
 |---|---|---|---|---|---|---|---|---|---|---|
 | FT-010 | 打开 PR 自动触发审查 | external-observation | e2e | yes | no | PASS | [Workflow](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37742626690) / [PR](https://github.com/CodesSentinels/ai-reviewer-test/pull/300) | - | 2026-10-08 | 日志 eventKind=pr_opened；run 创建于 PR 创建 6 秒后 |
-| FT-011 | synchronize/push 触发审查 | external-observation | e2e | yes | no | NOT_READY | - | - | 2026-10-08 | |
+| FT-011 | synchronize/push 触发审查 | external-observation | e2e | yes | no | PASS | [Workflow](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37745413862) | - | 2026-10-08 | pr_synchronize 事件触发（pull_request，已固定 SHA 的 workflow）；日志 eventKind=pr_synchronize，Will review from commit 4c47d40a（增量） |
 | FT-012 | reopened 触发审查 | external-observation | e2e | yes | no | NOT_READY | - | - | 2026-10-08 | |
 | FT-013 | 生成唯一顶部摘要 | external-observation | e2e | yes | no | PASS | [摘要评论](https://github.com/CodesSentinels/ai-reviewer-test/pull/300#issuecomment-6054749546) | - | 2026-10-08 | PR 上仅 1 条 bot 摘要评论 |
 | FT-014 | 后续审查更新既有摘要 | external-observation | e2e | yes | no | NOT_READY | - | - | 2026-10-08 | |
@@ -386,6 +386,7 @@
 | 持密钥 job 内 `actions/checkout@v4` 在 pull_request 事件下检出 PR 代码 | FT-213、FT-240 | 已证实：run 日志 HEAD 为 `eb10f70 Merge 4c47d40a into 8e0f917`；基线观察项，由用户决定是否判缺陷；不自行修改 |
 | `push` 触发含 `test/dev*`，新分支名不匹配 | FT-011 | 本轮只靠 pull_request 触发，FT-011 以 PR synchronize 为准 |
 | 项目 CLAUDE.md 原有说明（“动态解析分支”“开启 shell/lint”）已与本轮基线不一致 | 无 | 仅追加续作区块，原文未改动；请按需自行更新 |
+| **评论类事件使用默认分支 workflow**（本次新增） | 全部命令类用例（G/H/I 分区、FT-014/052/059/060/061/105/106 等） | 已证实：[run 37745545033](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37745545033) 的 ai-reviewer ref 为 `main`、shell/lint 为 true；需先把基线 workflow 合入 main，见“下一步” |
 | 首轮 run 的 max_files 截断 | FT-030~036、FT-091、FT-094 等 | 测试设计问题；已决定：`path_filters` 删除 `**/*.md`（基线第 4 处改动，已修改未提交），再用 full review 重审 |
 | PR 内导入扫描漏掉“同为新增且有导出”的导入方（本次新增） | FT-172~174、FT-179 | 源码依据：`dependency-analyzer.ts` step 2 的 prCandidates 排除 allModifiedSymbols；Phase 2 复测后再判定是否为缺陷 |
 | Phase 1 提交包含脚本维护文件 `.cases-prepared`、`.managed-files`、`.phase-1-generated` | 无 | 属于夹具目录的一部分，保留提交即可；不要手改 |
@@ -394,6 +395,7 @@
 
 ## 变更日志（倒序，只追加）
 
+- 2026-10-08T08:30:00Z：用户推送 commit 70a69dff（删除 `**/*.md`）并在 PR 评论 `@ai-reviewer full review`。读取两个 run：[37745413862](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37745413862)（pull_request / synchronize，固定 SHA，只含被排除路径→跳过，FT-011 PASS）、[37745545033](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37745545033)（issue_comment，用了 main 的旧 workflow：ai-reviewer main、shell/lint true、md 仍审查，delivered 10 条评论，本地 shell 被执行）。后者不作为 develop 证据；原因：用户报告 full review 执行完。
 - 2026-10-08T08:05:00Z：用户决定 md 文档不审查；在 `ai-reviewer.yml` 的 `path_filters` 删除 `**/*.md`（基线第 4 处改动，未提交），同步更新 baseline.md / README / 报告模板；原因：首轮 run 因 max_files=150 截断，workspace 夹具未被审查。
 - 2026-10-08T07:45:00Z：读取 PR #300 首轮 run（37742626690，约 6m14s，成功）。判定 PASS 22 项、SUBMITTED 17 项；发现 max_files=150 截断导致 workspace 夹具未被审查（测试设计问题）；更新 Issue #299；原因：用户提供 PR URL。
 - 2026-10-08T07:10:00Z：第一阶段准备完成：解析 SHA、创建分支/脚本/映射/变体/README/报告模板/进度文档，按基线修改 workflow（未提交）；原因：用户要求开工。
