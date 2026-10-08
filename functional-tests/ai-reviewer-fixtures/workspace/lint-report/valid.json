@@ -1,0 +1,9 @@
+{
+  "results": [
+    {"tool": "eslint", "toolVersion": "9.0.0", "file": "functional-tests/ai-reviewer-fixtures/workspace/lint/lint-issues.ts", "line": 2, "column": 9, "severity": "error", "ruleId": "no-unused-vars", "message": "'unused' is assigned a value but never used.", "fixable": false},
+    {"tool": "eslint", "toolVersion": "9.0.0", "file": "functional-tests/ai-reviewer-fixtures/workspace/lint/lint-issues.ts", "line": 3, "column": 3, "severity": "warning", "ruleId": "no-console", "message": "Unexpected console statement.", "fixable": false}
+  ],
+  "toolSummaries": [{"tool": "eslint", "toolVersion": "9.0.0", "available": true, "errors": 1, "warnings": 1}],
+  "durationMs": 120,
+  "filesScanned": 1
+}

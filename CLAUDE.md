@@ -55,3 +55,13 @@ Matching test documentation lives in `docs/`:
 - `docs/run-iter2-member-d-test.sh` — Script to drive multi-turn @bot conversations on a PR
 
 When adding new test cases, write intentionally flawed but **compilable** TypeScript/Vue. The bugs are the point.
+
+<!-- ai-reviewer-functional-test:start -->
+## ai-reviewer 功能回归测试
+
+- 开始任何与回归测试相关的工作前，先完整读取 `docs/ai-reviewer-functional-test-progress.md`，按其中“下一步”续作，不要重复已完成步骤；
+- 进度以该文档为续作入口，FT 定义以 `functional-tests/ai-reviewer-fixtures/case-map.tsv` 为准，对外验收视图是总回归 Issue；
+- 每判定一个 FT、创建/更新 Issue、或用户报告提交/推送/建 PR 后，同步更新该进度文档；会话结束前刷新“下一步”；
+- 仅真实证据通过的 FT 才能标 PASS；脚本输出（LOCAL_CHECK_PASS 等）不等于功能通过；
+- 未经用户明确要求，不 git add/commit/push，不创建 PR，不生成夹具，不读取或打印 Secret。
+<!-- ai-reviewer-functional-test:end -->
