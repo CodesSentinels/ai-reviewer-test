@@ -5,11 +5,12 @@
 
 ## 修改内容
 
-基线 = 现有 `.github/workflows/ai-reviewer.yml` + 三处修改（其余保持原样）：
+基线 = 现有 `.github/workflows/ai-reviewer.yml` + 四处修改（其余保持原样）：
 
 1. ai-reviewer 的 checkout 固定为本轮完整 SHA（`ref: <40 位 SHA>`），不再使用 `Resolve ai-reviewer branch` 的分支表达式；
 2. `enable_shell: false`；
-3. `enable_lint_tools: false`。
+3. `enable_lint_tools: false`；
+4. `path_filters` 删除 `**/*.md`（用户决定：md 文档不审查。测试用的 `cases/*.md`、README、docs 等不再占用 `max_files` 额度；首轮 run 因 270 个可审查文件 > 150 导致 `workspace/*.ts` 夹具未被审查）。
 
 依据：ai-reviewer 生产 workflow `.github/workflows/openai-review.yml` 与验收文档 `docs/github-only-acceptance-checklist.md` 均采用 shell/lint 关闭；本地 lint 仅适用于无业务密钥的执行面（`src/review.ts`）。
 

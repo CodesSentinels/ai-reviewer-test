@@ -74,7 +74,6 @@ jobs:
             **/*.ts
             **/*.vue
             **/*.js
-            **/*.md
             **/*.yml
             **/*.yaml
             package.json

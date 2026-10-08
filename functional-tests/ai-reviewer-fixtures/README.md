@@ -22,7 +22,7 @@ workflow 通过 `actions/checkout` 的 `ref: <完整 SHA>` 固定 ai-reviewer，
 
 ## 基线
 
-现有 `ai-reviewer.yml` + 三处修改：固定 SHA、`enable_shell: false`、`enable_lint_tools: false`。依赖 shell/lint 开启的用例（FT-184, FT-185, FT-186, FT-187, FT-188, FT-191, FT-192, FT-193, FT-194, FT-195, FT-196, FT-197, FT-198, FT-199, FT-200, FT-201, FT-202, FT-203）需要**无业务密钥的隔离环境**，见 `config-variants/shell-on-isolated.md`、`lint-on-isolated.md`；未提供环境则保持 BLOCKED，基线下不得判 PASS。
+现有 `ai-reviewer.yml` + 四处修改：固定 SHA、`enable_shell: false`、`enable_lint_tools: false`、`path_filters` 删除 `**/*.md`（md 不审查）。依赖 shell/lint 开启的用例（FT-184, FT-185, FT-186, FT-187, FT-188, FT-191, FT-192, FT-193, FT-194, FT-195, FT-196, FT-197, FT-198, FT-199, FT-200, FT-201, FT-202, FT-203）需要**无业务密钥的隔离环境**，见 `config-variants/shell-on-isolated.md`、`lint-on-isolated.md`；未提供环境则保持 BLOCKED，基线下不得判 PASS。
 
 覆盖方式统计：e2e 207、unit-evidence 8、needs-injection 11。
 

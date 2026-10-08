@@ -22,7 +22,7 @@
 
 ## 基线与线上配置差异
 
-- 测试基线采用安全加固配置：`enable_shell: false`、`enable_lint_tools: false`，ai-reviewer checkout 固定到锁定 SHA；
+- 测试基线采用安全加固配置：`enable_shell: false`、`enable_lint_tools: false`，ai-reviewer checkout 固定到锁定 SHA；另删除 `path_filters` 中的 `**/*.md`（md 不审查，避免测试文档占满 `max_files`）；
 - 与线上/实际部署配置的差异：待填写（线上是否开启 shell、lint）；
 - 依赖隔离环境的变体（shell-on-isolated / lint-on-isolated）：是否已运行、使用的环境、是否使用专用 key：待填写；
 - 与 ai-reviewer 仓库较早测试计划（`docs/tasks/tester-1-core-review-testcases.md`、`tester-3-quality-control-testcases.md`，以 shell/lint 开启为前提）的差异：本轮以验收文档与生产 workflow 为准，沿用旧计划的用例已映射到隔离变体，不直接套用旧预期。
