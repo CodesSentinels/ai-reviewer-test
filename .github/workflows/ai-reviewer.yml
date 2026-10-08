@@ -49,16 +49,11 @@ jobs:
         with:
           node-version: "20"
       - uses: actions/checkout@v4
-      # 动态解析 ai-reviewer 分支：PR 取 base_ref，push 取 ref_name
-      - name: Resolve ai-reviewer branch
-        id: ref
-        run: |
-          BRANCH="${{ github.base_ref || github.event.pull_request.base.ref || github.ref_name }}"
-          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+      # 本轮锁定 SHA，来源 develop，获取时间 2026-10-08T06:44:44Z，见 docs/ai-reviewer-functional-test-progress.md
       - uses: actions/checkout@v4
         with:
           repository: CodesSentinels/ai-reviewer
-          ref: ${{ steps.ref.outputs.branch }}
+          ref: 8c84f45fab547821ecefbf56aabbf215eb9d7dbf
           path: .github/ai-reviewer-action
           token: ${{ steps.bot-token.outputs.token }}
       - uses: ./.github/ai-reviewer-action
