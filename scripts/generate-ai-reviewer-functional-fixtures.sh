@@ -210,8 +210,8 @@ remove_managed() {
 # 夹具故意不写“这里有 BUG”之类的提示注释，避免给审查模型泄题；缺陷清单见 README。
 gen_stages() {
   case "$1" in
-    generate_baseline|generate_lint|generate_lint_report|generate_performance_bug|generate_style_nit) echo "1" ;;
-    generate_logic_bug|generate_security_bug|generate_cross_file|generate_file_ops|generate_incremental) echo "1 2" ;;
+    generate_baseline|generate_lint|generate_lint_report|generate_performance_bug) echo "1" ;;
+    generate_logic_bug|generate_security_bug|generate_cross_file|generate_file_ops|generate_incremental|generate_style_nit) echo "1 2" ;;
     generate_revert) echo "1 2 3" ;;
     generate_path_filter|generate_many_files|generate_large_diff|generate_noise_limit|generate_simple_change|generate_unresolved_import|generate_shell_injection|generate_prompt_injection) echo "3" ;;
     *) echo "" ;;
@@ -375,15 +375,28 @@ export function sortedCopies(lines: Line[]): Line[][] {
 EOF
 }
 
-# 刻意违反 Prettier 的样式噪音（不要对夹具目录运行 prettier）
+# Phase 1：刻意违反 Prettier 的样式噪音（不要对夹具目录运行 prettier）
+# Phase 2：同一文件仅做格式化改动（引号、分号、空格、缩进），标识符不变；
+#          这才是“仅含格式化的 diff”，用于验证默认被判 APPROVED 而不被评论（FT-036 / FT-037）
 generate_style_nit() {
-  put workspace/style/nits.ts <<'EOF'
+  case "$1" in
+    1) put workspace/style/nits.ts <<'EOF'
 export const user_name = 'ada'
 export function Add_Numbers(a:number,b:number){
     return a+b
 }
 export const greeting_text = "hello"  ;
 EOF
+    ;;
+    2) put workspace/style/nits.ts <<'EOF'
+export const user_name = "ada";
+export function Add_Numbers(a: number, b: number) {
+  return a + b;
+}
+export const greeting_text = "hello";
+EOF
+    ;;
+  esac
 }
 
 generate_cross_file() {

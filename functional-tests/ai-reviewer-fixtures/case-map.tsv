@@ -29,8 +29,8 @@ FT-032	识别明显性能问题	fixture	performance-bug	1	generate_performance_b
 FT-033	评论位于实际变更行	fixture	logic-bug	1	generate_logic_bug	FT-030	inline-comment,diff-hunk	e2e	baseline	none	author	no	1	-	yes	no
 FT-034	不评论不存在或未变更行	fixture	logic-bug	1	generate_logic_bug	FT-030	inline-comment,diff-hunk	e2e	baseline	none	author	no	1	-	yes	no
 FT-035	建议代码格式正确	fixture	logic-bug	1	generate_logic_bug	FT-030	inline-comment,diff-hunk	e2e	baseline	none	author	no	1	-	yes	no
-FT-036	默认忽略轻微样式问题	fixture	style-nit	1	generate_style_nit	FT-010	review-comments	e2e	baseline	none	author	no	1	-	yes	no
-FT-037	review_simple_changes=true 生效	fixture	style-nit	1	generate_style_nit	FT-036	review-comments	e2e	simple-changes	none	author	no	1	-	yes	no
+FT-036	默认忽略轻微样式问题	fixture	style-nit	1,2	generate_style_nit	FT-010	review-comments	e2e	baseline	none	author	no	1	-	yes	no
+FT-037	review_simple_changes=true 生效	fixture	style-nit	1,2	generate_style_nit	FT-036	review-comments	e2e	simple-changes	none	author	no	1	-	yes	no
 FT-038	review_comment_lgtm=false 生效	external-observation	inline-quality	variant	print_variant_steps	FT-010	review-comments	e2e	lgtm-off	none	author	no	1	-	yes	no
 FT-039	review_comment_lgtm=true 生效	external-observation	inline-quality	variant	print_variant_steps	FT-010	review-comments	e2e	lgtm-on	none	author	no	1	-	yes	no
 FT-040	非法模型输出安全处理	external-observation	inline-quality	1	print_observation_steps	none	unit-test-or-log	needs-injection	baseline	mock-invalid-model-output	none	no	0	-	yes	no
