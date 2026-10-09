@@ -72,7 +72,7 @@ jobs:
           enable_dependency_analysis: true
           enable_lint_tools: false
           enable_semgrep: true
-          lint_report_path: functional-tests/ai-reviewer-fixtures/workspace/lint-report/top-array.json
+          lint_report_path: functional-tests/ai-reviewer-fixtures/workspace/lint-report/oversize.json
           max_dependency_files: "1"
           bot_icon: "🧪"
           bot_name: "Regression Bot"
