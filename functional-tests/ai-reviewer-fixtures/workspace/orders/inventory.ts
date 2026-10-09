@@ -5,3 +5,11 @@ export function reserve(stock: Stock, sku: string, qty: number): boolean {
   stock[sku] = stock[sku] - qty;
   return true;
 }
+
+export function release(stock: Stock, sku: string, qty: number): void {
+  stock[sku] += qty;
+}
+
+export function snapshot(stock: Stock): Stock {
+  return JSON.parse(JSON.stringify(stock));
+}

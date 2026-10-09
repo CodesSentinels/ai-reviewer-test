@@ -1,6 +1,15 @@
 import type { Order } from "./types";
 
-export function formatOrder(order: Order): string {
+export interface FormatOptions {
+  locale: string;
+  showItems: boolean;
+}
+
+export function formatOrder(
+  order: Order,
+  options: FormatOptions,
+): { text: string; total: number } {
   const total = order.items.reduce((sum, item) => sum + item.qty * item.price, 0);
-  return `${order.id}: ${total.toFixed(2)} ${order.currency}`;
+  const text = `${order.id}: ${total.toLocaleString(options.locale)} ${order.currency}`;
+  return { text, total };
 }
