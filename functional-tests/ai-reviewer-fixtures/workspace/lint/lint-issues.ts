@@ -17,3 +17,5 @@ export function lintTarget(items: string[], flag: any) {
 // touch 8
 
 // touch 9
+
+// touch 10
