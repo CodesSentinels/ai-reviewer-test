@@ -70,20 +70,8 @@ jobs:
           enable_shell: false
           enable_web_search: false
           enable_dependency_analysis: true
-          path_filters: |
-            **/*.ts
-            **/*.vue
-            **/*.js
-            **/*.yml
-            **/*.yaml
-            package.json
-            !**/*.lock
-            !node_modules/**
-            !dist/**
-            !.output/**
           enable_lint_tools: false
           enable_semgrep: true
-          max_files: "10"
           max_dependency_files: "1"
           bot_icon: "🧪"
           bot_name: "Regression Bot"

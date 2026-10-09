@@ -1,0 +1,1 @@
+Plain text note: excluded by the baseline include-only path_filters.
