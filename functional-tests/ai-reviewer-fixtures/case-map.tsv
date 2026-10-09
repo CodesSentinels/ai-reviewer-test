@@ -58,7 +58,7 @@ FT-077	max_files 生效	fixture	large-diff	3	generate_many_files	FT-051	workflow
 FT-078	超大 diff 安全处理	fixture	large-diff	3	generate_large_diff	FT-051	workflow-log,summary	e2e	baseline	none	author	no	3	-	yes	no
 FT-079	新增文件处理正确	multi-phase	file-ops	1,2	generate_file_ops	FT-010	summary,review-comments	e2e	baseline	none	author	no	3	-	yes	no
 FT-080	删除文件处理正确	multi-phase	file-ops	1,2	generate_file_ops	FT-010	summary,review-comments	e2e	baseline	none	author	no	3	-	yes	no
-FT-081	重命名文件处理正确	multi-phase	file-ops	1,2	generate_file_ops	FT-010	summary,review-comments	e2e	baseline	none	author	no	3	-	yes	no
+FT-081	重命名文件处理正确	multi-phase	file-ops	1,2,3	generate_file_ops	FT-010	summary,review-comments	e2e	baseline	none	author	no	3	-	yes	no
 FT-082	空 diff 不产生垃圾评论	external-observation	filter	command	print_observation_steps	FT-010	workflow-log,review-comments	e2e	baseline	none	author	no	1	-	yes	no
 FT-090	max_review_comments 生效	fixture	noise-limit	3	generate_noise_limit	FT-051	review-comments	e2e	max-comments	none	author	no	3	-	yes	no
 FT-091	超限时优先保留高严重度问题	fixture	noise-limit	3	generate_noise_limit	FT-051	review-comments	e2e	max-comments	none	author	no	3	-	yes	no

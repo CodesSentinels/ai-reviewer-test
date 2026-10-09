@@ -17,24 +17,24 @@
 - workflow_active_variant: baseline
 - baseline_profile: secure(shell=false, lint=false)
 - isolated_env: pending
-- current_stage: PHASE1_SUBMITTED
-- last_updated: 2026-10-09T02:30:00Z
-- last_updated_by_step: resolve 与真人线程验证完成（FT-114/115/162 PASS）；等待用户提交文档/脚本改动并进入 Phase 2
+- current_stage: PHASE2_SUBMITTED
+- last_updated: 2026-10-09T03:10:00Z
+- last_updated_by_step: 读取 Phase 2 增量审查（run 37874287998）：10 项 PASS、FT-036 FAIL（缺陷 #301）；Phase 3 增加重命名探针
 
 ## 下一步（Next Actions）
 
-1. 用户：先把当前未提交的改动提交并推送（进度文档、脚本、case-map、FT-036/037 用例）。单独成一个 commit，不要和 Phase 2 夹具混在一起，这样 Phase 2 的增量 diff 才干净。这些文件都是 md / tsv / sh，会被路径过滤排除，pull_request run 会因“没有可审查文件”跳过。完成判定：PR #300 出现新 commit。
-2. 用户：`--phase 2 --dry-run` → `--phase 2` → `git status --short` / `git diff -- functional-tests/ai-reviewer-fixtures` 检查增量 diff → 手动提交（只含 Phase 2 夹具和 `.phase-2-generated` 等受管文件）→ 推送 → 把 commit 和 pull_request run 链接发给 Claude。Phase 2 包含：inventory.ts 新增 release/snapshot、pricing.ts 修复循环并新增税费缺陷、token-check.ts（eval）、formatter.ts 改签名并改返回语义（旧调用方保留）、fileops 删除/重命名/新增、revert/rules.ts 改动、nits.ts 仅格式化改动。
-3. Claude：读取 Phase 2 的增量审查，判定 FT-051、FT-034、FT-036、FT-170~174、FT-179、FT-079~081、FT-011/014 的补充证据等。
-4. 用户：之后做 `simple-changes` 变体对比 FT-037，Phase 3，以及配置变体轮次（见 Issue 人工操作清单）。
-5. 用户（可并行）：确认基线偏差表，回答是否提供隔离环境。
+1. 用户：把当前未提交的改动提交并推送（进度文档、脚本、case-map、FT-081 用例：Phase 3 增加重命名探针）。这些都是 md/tsv/sh，被路径过滤排除，不会触发审查。完成判定：PR #300 出现新 commit。
+2. 用户：`--phase 3 --dry-run` → `--phase 3` → 检查 diff → 提交推送 → 把 commit 和 pull_request run 链接发给 Claude。Phase 3 会生成：rules.ts 回退（FT-058）、被过滤文件（txt/lock/dist/generated/png，FT-072~076）、many/ 40 个文件（FT-077）、large-module.ts（FT-078/292）、noise/many-issues.ts 30 处问题（FT-090~094）、unresolved/importer.ts（FT-177）、injection/*（FT-187/188/243~246）、greeter.ts 微小改动（FT-095）、final-name.ts 重命名（FT-081）。体量大、模型调用多（约 90 个可审查文件，`max_files=150` 内），知悉后再推送。
+3. Claude：读取 Phase 3 审查，判定 FT-058、FT-072~078、FT-081、FT-090~095、FT-177、FT-245、FT-246 等。
+4. 用户：之后做配置变体轮次（`simple-changes` 复测 FT-037、`max-comments`、`max-files` 等）、命令类用例（G/H 分区）、隔离环境相关用例。
+5. 用户（可并行）：确认基线偏差表，回答是否提供隔离环境；决定缺陷 #301 是否需要通知 ai-reviewer 团队。
 
 ## 阶段与运行记录
 
 | 阶段/变体 | 分支 | Commit SHA | PR | Workflow | 时间 | 状态 |
 |---|---|---|---|---|---|---|
 | Phase 1 | `test/ai-reviewer-develop-functional-20261008` | `4c47d40a` | [#300](https://github.com/CodesSentinels/ai-reviewer-test/pull/300) | [run 37742626690](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37742626690) | 2026-10-08T07:18Z（耗时约 6m14s） | SUBMITTED |
-| Phase 2 | `test/ai-reviewer-develop-functional-20261008` | 待填写 | 同一 PR | 待填写 | 待填写 | NOT_READY |
+| Phase 2 | `test/ai-reviewer-develop-functional-20261008` | `83140bc0` | 同一 PR | [run 37874287998](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37874287998) | 2026-10-09T02:22Z（约 1m20s） | SUBMITTED |
 | Phase 3 | `test/ai-reviewer-develop-functional-20261008` | 待填写 | 同一 PR | 待填写 | 待填写 | NOT_READY |
 
 ## 准备步骤清单
@@ -54,7 +54,7 @@
 
 ## FT 状态总表
 
-汇总：共 226 项；PASS 40 / FAIL 0 / BLOCKED 0 / N/A 0 / 其余 186（NOT_READY 174、SUBMITTED 12）。
+汇总：共 226 项；PASS 50 / FAIL 1 / BLOCKED 0 / N/A 0 / 其余 175（NOT_READY 168、SUBMITTED 7）。
 
 ### A. 环境与启动
 
@@ -98,9 +98,9 @@
 | FT-031 | 识别明确安全问题 | fixture | e2e | yes | no | PASS | [评论1](https://github.com/CodesSentinels/ai-reviewer-test/pull/300#discussion_r4216981092) / [评论2](https://github.com/CodesSentinels/ai-reviewer-test/pull/300#discussion_r4216981106) / [Workflow](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37753470889) | - | 2026-10-08 | session.ts：SQL 拼接注入（🔴严重）、`==` 宽松相等；XSS 拼接另有 finding 但被 dedupe 跳过 |
 | FT-032 | 识别明显性能问题 | fixture | e2e | yes | no | PASS | [评论](https://github.com/CodesSentinels/ai-reviewer-test/pull/300#discussion_r4217282232) / [评论](https://github.com/CodesSentinels/ai-reviewer-test/pull/300#discussion_r4217282269) / [Workflow](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37757357236) | - | 2026-10-08 | 两条性能评论：aggregate.ts:26-31 循环内重复排序（🔴）、aggregate.ts:6-23 totalsBySku 的 O(n²) 多次扫描（🟡） |
 | FT-033 | 评论位于实际变更行 | fixture | e2e | yes | no | PASS | [评论](https://github.com/CodesSentinels/ai-reviewer-test/pull/300#discussion_r4216981092) / [评论](https://github.com/CodesSentinels/ai-reviewer-test/pull/300#discussion_r4216981116) / [评论](https://github.com/CodesSentinels/ai-reviewer-test/pull/300#discussion_r4216981127) | - | 2026-10-08 | 本轮 4 条行级评论均落在新增文件的实际缺陷行范围内，failed: 0（新增文件场景，未变更行对照见 FT-034） |
-| FT-034 | 不评论不存在或未变更行 | fixture | e2e | yes | no | SUBMITTED | [Workflow](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37753470889) | - | 2026-10-08 | 本轮均为新增文件，无法区分未变更行；需 Phase 2 修改既有文件后判定 |
+| FT-034 | 不评论不存在或未变更行 | fixture | e2e | yes | no | PASS | [Workflow](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37874287998) / [评论](https://github.com/CodesSentinels/ai-reviewer-test/pull/300#discussion_r4226033704) | - | 2026-10-09 | Phase 2 的 6 条评论全部落在本次 diff 内；旧缺陷行（inventory.ts reserve、pricing.ts 折扣符号）未被重复评论 |
 | FT-035 | 建议代码格式正确 | fixture | e2e | yes | no | PASS | [评论](https://github.com/CodesSentinels/ai-reviewer-test/pull/300#discussion_r4216981092) / [评论](https://github.com/CodesSentinels/ai-reviewer-test/pull/300#discussion_r4216981106) | - | 2026-10-08 | 修复建议为 <details> 内格式正确的 diff 代码块 |
-| FT-036 | 默认忽略轻微样式问题 | fixture | e2e | yes | no | SUBMITTED | [评论](https://github.com/CodesSentinels/ai-reviewer-test/pull/300#discussion_r4217282245) / [Workflow](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37757357236) | - | 2026-10-08 | nits.ts 被评论且标为 🔴严重（纯命名/格式问题）。但 Phase 1 是新增文件，不属于提示词里“仅含格式化的改动→triage 为 APPROVED”的情形，不是有效探针；已在 Phase 2 增加同一文件仅格式化的改动用于复测。严重度标注偏高另见观察项 |
+| FT-036 | 默认忽略轻微样式问题 | fixture | e2e | yes | no | FAIL | [评论](https://github.com/CodesSentinels/ai-reviewer-test/pull/300#discussion_r4226033711) / [Workflow](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37874287998) / [缺陷 #301](https://github.com/CodesSentinels/ai-reviewer-test/issues/301) | [#301](https://github.com/CodesSentinels/ai-reviewer-test/issues/301) | 2026-10-09 | Phase 2 仅格式化改动：nits.ts triage 为 NEEDS_REVIEW（预期 APPROVED）并收到 🔴严重评论，评论称“新增的命名”但 diff 无命名变化；缺陷 #301，状态 WAITING_FOR_FIX |
 | FT-037 | review_simple_changes=true 生效 | fixture | e2e | yes | no | NOT_READY | - | - | 2026-10-08 | |
 | FT-038 | review_comment_lgtm=false 生效 | external-observation | e2e | yes | no | NOT_READY | - | - | 2026-10-08 | |
 | FT-039 | review_comment_lgtm=true 生效 | external-observation | e2e | yes | no | NOT_READY | - | - | 2026-10-08 | |
@@ -111,7 +111,7 @@
 | FT | 标题 | type | coverage | baselineMeaningful | 隔离环境 | 状态 | 证据链接 | 缺陷 Issue | 最后更新 | 备注 |
 |---|---|---|---|---|---|---|---|---|---|---|
 | FT-050 | 首次审查覆盖 base 到 HEAD | external-observation | e2e | yes | no | PASS | [Workflow](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37742626690) / [摘要评论](https://github.com/CodesSentinels/ai-reviewer-test/pull/300#issuecomment-6054749546) | - | 2026-10-08 | PatchScan 270 个文件；已审查 marker=4c47d40a（PR head） |
-| FT-051 | 第二个 commit 仅审查新增变化 | multi-phase | e2e | yes | no | NOT_READY | - | - | 2026-10-08 | |
+| FT-051 | 第二个 commit 仅审查新增变化 | multi-phase | e2e | yes | no | PASS | [Workflow](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37874287998) / [评论](https://github.com/CodesSentinels/ai-reviewer-test/pull/300#discussion_r4226033704) | - | 2026-10-09 | pull_request run：Will review from commit 3ab89ae5（上次已审查）；只有 Phase 2 的 8 个文件进入审查，评论只落在新增行（inventory.ts 9-14），旧的 reserve 缺陷未重复评论 |
 | FT-052 | 已审查 commit 状态正确保存 | multi-phase | e2e | yes | no | PASS | [摘要评论](https://github.com/CodesSentinels/ai-reviewer-test/pull/300#issuecomment-6054749546) | - | 2026-10-08 | commit-ids-reviewed marker 累计保存 4c47d40a、70a69dff、803b07c9、bc29e49c；Phase 2 增量复核仍待 FT-051 |
 | FT-053 | 重跑相同 workflow 不重复发布 | external-observation | e2e | yes | no | NOT_READY | - | - | 2026-10-08 | |
 | FT-054 | 重复事件不重复执行完整审查 | external-observation | e2e | yes | no | PASS | [命令评论](https://github.com/CodesSentinels/ai-reviewer-test/pull/300#issuecomment-6056667599) / [回复](https://github.com/CodesSentinels/ai-reviewer-test/pull/300#issuecomment-6056673686) / [Workflow](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37755374749) | - | 2026-10-08 | 同一 HEAD（bc29e49）再次 full review：回复 No new changes detected since the last review；run 约 27 秒，日志 summarize/reviewing/submit 均为 0（未重复执行审查） |
@@ -137,9 +137,9 @@
 | FT-076 | 二进制和图片默认排除 | fixture | e2e | yes | no | NOT_READY | - | - | 2026-10-08 | |
 | FT-077 | max_files 生效 | fixture | e2e | yes | no | SUBMITTED | [Workflow](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37742626690) | - | 2026-10-08 | 默认 max_files=150 已观察到 270→150；变体 max-files(10) 与 many/ 夹具未运行 |
 | FT-078 | 超大 diff 安全处理 | fixture | e2e | yes | no | NOT_READY | - | - | 2026-10-08 | |
-| FT-079 | 新增文件处理正确 | multi-phase | e2e | yes | no | NOT_READY | - | - | 2026-10-08 | |
-| FT-080 | 删除文件处理正确 | multi-phase | e2e | yes | no | NOT_READY | - | - | 2026-10-08 | |
-| FT-081 | 重命名文件处理正确 | multi-phase | e2e | yes | no | NOT_READY | - | - | 2026-10-08 | |
+| FT-079 | 新增文件处理正确 | multi-phase | e2e | yes | no | PASS | [Workflow](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37874287998) | - | 2026-10-09 | new-file.ts：triage NEEDS_REVIEW，已审查，无误报评论 |
+| FT-080 | 删除文件处理正确 | multi-phase | e2e | yes | no | PASS | [Workflow](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37874287998) | - | 2026-10-09 | legacy.ts、old-name.ts 被删除：PatchScan 只含 8 个文件，删除文件被跳过，run 成功、无评论、无报错（摘要是否体现删除未核对） |
+| FT-081 | 重命名文件处理正确 | multi-phase | e2e | yes | no | SUBMITTED | [Workflow](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37874287998) | - | 2026-10-09 | GitHub compare 把 old-name.ts→renamed.ts 显示为 removed + added（内容有改动，相似度不足），不是有效的重命名探针；已在 Phase 3 增加 renamed.ts→final-name.ts 内容完全相同的重命名 |
 | FT-082 | 空 diff 不产生垃圾评论 | external-observation | e2e | yes | no | NOT_READY | - | - | 2026-10-08 | |
 
 ### F. 噪音控制
@@ -225,16 +225,16 @@
 
 | FT | 标题 | type | coverage | baselineMeaningful | 隔离环境 | 状态 | 证据链接 | 缺陷 Issue | 最后更新 | 备注 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| FT-170 | 识别导出函数签名变化 | multi-phase | e2e | yes | no | NOT_READY | - | - | 2026-10-08 | |
-| FT-171 | 识别返回语义变化 | multi-phase | e2e | yes | no | NOT_READY | - | - | 2026-10-08 | |
-| FT-172 | 支持相对路径导入 | fixture | e2e | yes | no | SUBMITTED | [Workflow](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37753470889) | - | 2026-10-08 | 固定 SHA 的 run 仍只发现 index.ts→formatter/types 的 2 条 PR 内导入（原因同前：导入方同为新增且有导出）；Phase 2 复测 |
-| FT-173 | 支持别名导入 | fixture | e2e | yes | no | SUBMITTED | [Workflow](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37753470889) | - | 2026-10-08 | 同 FT-172 |
-| FT-174 | 支持目录 index 导入 | fixture | e2e | yes | no | SUBMITTED | [Workflow](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37753470889) | - | 2026-10-08 | 同 FT-172 |
+| FT-170 | 识别导出函数签名变化 | multi-phase | e2e | yes | no | PASS | [Workflow](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37874287998) / [评论](https://github.com/CodesSentinels/ai-reviewer-test/pull/300#discussion_r4226033719) | - | 2026-10-09 | formatter.ts:8-14 🔴评论：指出返回值 string→{text,total}、新增必填参数，并列出 5 个受影响调用方 |
+| FT-171 | 识别返回语义变化 | multi-phase | e2e | yes | no | PASS | [Workflow](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37874287998) / [评论](https://github.com/CodesSentinels/ai-reviewer-test/pull/300#discussion_r4226033719) | - | 2026-10-09 | 同一评论指出返回语义变化（依赖字符串的地方需改读 text） |
+| FT-172 | 支持相对路径导入 | fixture | e2e | yes | no | PASS | [Workflow](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37874287998) / [评论](https://github.com/CodesSentinels/ai-reviewer-test/pull/300#discussion_r4226033719) | - | 2026-10-09 | summary.ts:5 的相对路径导入（../shared/formatter）被列为受影响调用方 |
+| FT-173 | 支持别名导入 | fixture | e2e | yes | no | PASS | [Workflow](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37874287998) / [评论](https://github.com/CodesSentinels/ai-reviewer-test/pull/300#discussion_r4226033719) | - | 2026-10-09 | alias-user.ts:5 的别名导入（~/functional-tests/…）被列为受影响调用方 |
+| FT-174 | 支持目录 index 导入 | fixture | e2e | yes | no | PASS | [Workflow](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37874287998) / [评论](https://github.com/CodesSentinels/ai-reviewer-test/pull/300#discussion_r4226033719) | - | 2026-10-09 | index-user.ts:5 的目录 index 导入（../shared）被列为受影响调用方，shared/index.ts 作为 barrel 也被识别 |
 | FT-175 | 关闭依赖分析后安全降级 | external-observation | e2e | yes | no | NOT_READY | - | - | 2026-10-08 | |
 | FT-176 | max_dependency_files 生效 | external-observation | e2e | yes | no | NOT_READY | - | - | 2026-10-08 | |
 | FT-177 | 无法解析依赖时安全降级 | fixture | e2e | yes | no | NOT_READY | - | - | 2026-10-08 | |
 | FT-178 | 仓库树缓存不跨 PR 污染 | external-observation | e2e | yes | no | NOT_READY | - | - | 2026-10-08 | |
-| FT-179 | 当前技术栈依赖分析正确 | fixture | e2e | yes | no | SUBMITTED | [Workflow](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37753470889) | - | 2026-10-08 | 同 FT-172 |
+| FT-179 | 当前技术栈依赖分析正确 | fixture | e2e | yes | no | PASS | [Workflow](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37874287998) / [评论](https://github.com/CodesSentinels/ai-reviewer-test/pull/300#discussion_r4226033719) | - | 2026-10-09 | Vue SFC OrderCard.vue:7 作为调用方被识别（依赖分析 step 6：6 个文件分析、5 处跨文件引用） |
 
 ### K. Web Search 与 Shell
 
@@ -364,7 +364,11 @@
 
 ## 缺陷清单
 
-暂无。（失败行永不删除，修复后追加 RETEST 记录。）
+| 缺陷 Issue | FT | ai-reviewer SHA | 失败 commit | 首次失败证据 | 状态 |
+|---|---|---|---|---|---|
+| [#301](https://github.com/CodesSentinels/ai-reviewer-test/issues/301) | FT-036 | `8c84f45f` | `83140bc0` | [run 37874287998](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37874287998)、[评论 r4226033711](https://github.com/CodesSentinels/ai-reviewer-test/pull/300#discussion_r4226033711) | WAITING_FOR_FIX |
+
+（失败行永不删除，修复后追加 RETEST 记录。）
 
 ## 阻塞与待用户事项
 
@@ -387,7 +391,8 @@
 | `push` 触发含 `test/dev*`，新分支名不匹配 | FT-011 | 本轮只靠 pull_request 触发，FT-011 以 PR synchronize 为准 |
 | 项目 CLAUDE.md 原有说明（“动态解析分支”“开启 shell/lint”）已与本轮基线不一致 | 无 | 仅追加续作区块，原文未改动；请按需自行更新 |
 | **评论类事件使用默认分支 workflow**（本次新增） | 全部命令类用例（G/H/I 分区、FT-014/052/059/060/061/105/106 等） | 已证实：[run 37745545033](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37745545033) 的 ai-reviewer ref 为 `main`、shell/lint 为 true；需先把基线 workflow 合入 main，见“下一步” |
-| 纯样式/lint 类问题被标为 🔴严重（本次新增） | FT-091、FT-094，间接影响 FT-036 | 观察项：nits.ts、lint-issues.ts 的评论均为严重；提示词里 `nit` 定义为 trivial improvements。是否记为缺陷由用户决定，Phase 2/3 再收集更多样本 |
+| Phase 2 的 pricing.ts 评论把循环边界修复称为“逻辑回归”；inventory.ts 只评论 snapshot、未指出 release 不校验数量（本次新增） | FT-030、FT-051 | 评论质量观察项，不影响 PASS 判定 |
+| 纯样式/lint 类问题被标为 🔴严重 | FT-091、FT-094，间接影响 FT-036 | 观察项：nits.ts、lint-issues.ts 的评论均为严重；提示词里 `nit` 定义为 trivial improvements。是否记为缺陷由用户决定，Phase 2/3 再收集更多样本 |
 | 首轮 run 的 max_files 截断 | FT-030~036、FT-091、FT-094 等 | 测试设计问题；已决定：`path_filters` 删除 `**/*.md`（基线第 4 处改动，已修改未提交），再用 full review 重审 |
 | PR 内导入扫描漏掉“同为新增且有导出”的导入方（本次新增） | FT-172~174、FT-179 | 源码依据：`dependency-analyzer.ts` step 2 的 prCandidates 排除 allModifiedSymbols；Phase 2 复测后再判定是否为缺陷 |
 | Phase 1 提交包含脚本维护文件 `.cases-prepared`、`.managed-files`、`.phase-1-generated` | 无 | 属于夹具目录的一部分，保留提交即可；不要手改 |
@@ -396,6 +401,7 @@
 
 ## 变更日志（倒序，只追加）
 
+- 2026-10-09T03:10:00Z：用户提交 Phase 2（83140bc0）。读取 [run 37874287998](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37874287998)（pull_request / pr_synchronize，固定 SHA，Will review from 3ab89ae5，8 个文件，delivered 6）：新增 PASS 10 项（FT-034/051/079/080/170/171/172/173/174/179）；FT-036 FAIL，创建缺陷 [#301](https://github.com/CodesSentinels/ai-reviewer-test/issues/301)；FT-081 因 GitHub 未识别为重命名保持 SUBMITTED，Phase 3 增加 100% 相同内容的重命名；原因：用户提供 run 链接。
 - 2026-10-09T02:30:00Z：用户在 PR 上发了真人行级评论（pricing.ts:11）并再次执行 resolve。读取 [run 37873621471](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37873621471)、[run 37873586079](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37873586079)：resolve 回复“已解决 8 条”，GraphQL 复核 45 个线程中 44 个已 resolved（均为 bot），真人线程仍 unresolved；真人评论无 mention 被 ignored。FT-114/115/162 PASS。原因：用户反馈 resolve 结果并询问是否先提交文档。
 - 2026-10-08T10:15:00Z：用户提交 3ab89ae 后第五次发布 full review，读取 [run 37757357236](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37757357236)：ref 8c84f45f…、full diff 审查 18 个文件、发布 8 条评论；FT-030 PASS，FT-032 复核 PASS；FT-036 因 nits.ts 是新增文件不是有效探针，给 `generate_style_nit` 增加 Phase 2 仅格式化改动（脚本、case-map、FT-036/037 用例已更新）；记录严重度偏高观察项。原因：用户提供 run 链接。
 - 2026-10-08T09:50:00Z：用户第四次发布 full review（截图：HEAD bc29e49 已审查，No new changes detected）。读取 [run 37755374749](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37755374749)：ref 8c84f45f…，摘要/审查/提交均为 0，约 27 秒。源码核对：`fullReviewHandler` 在 `isHeadAlreadyReviewed` 为真时直接返回，属设计行为；FT-054 PASS，FT-298 SUBMITTED（缺用量面板）。

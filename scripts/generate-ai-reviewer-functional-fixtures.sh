@@ -211,7 +211,8 @@ remove_managed() {
 gen_stages() {
   case "$1" in
     generate_baseline|generate_lint|generate_lint_report|generate_performance_bug) echo "1" ;;
-    generate_logic_bug|generate_security_bug|generate_cross_file|generate_file_ops|generate_incremental|generate_style_nit) echo "1 2" ;;
+    generate_logic_bug|generate_security_bug|generate_cross_file|generate_incremental|generate_style_nit) echo "1 2" ;;
+    generate_file_ops) echo "1 2 3" ;;
     generate_revert) echo "1 2 3" ;;
     generate_path_filter|generate_many_files|generate_large_diff|generate_noise_limit|generate_simple_change|generate_unresolved_import|generate_shell_injection|generate_prompt_injection) echo "3" ;;
     *) echo "" ;;
@@ -625,6 +626,20 @@ EOF
       put workspace/fileops/new-file.ts <<'EOF'
 export function slugify(input: string): string {
   return input.toLowerCase().replace(/\s+/g, "-");
+}
+EOF
+    ;;
+    3)
+      # 内容完全相同的重命名（相似度 100%），GitHub 才会识别为 renamed；
+      # Phase 2 的 old-name.ts → renamed.ts 因为改了内容，被识别成“删除 + 新增”
+      remove_managed workspace/fileops/renamed.ts
+      put workspace/fileops/final-name.ts <<'EOF'
+export function normalizeName(name: string): string {
+  return name.trim().toLowerCase();
+}
+
+export function normalizeAll(names: string[]): string[] {
+  return names.map(normalizeName);
 }
 EOF
     ;;
