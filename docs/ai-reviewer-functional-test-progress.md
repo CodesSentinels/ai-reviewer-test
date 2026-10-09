@@ -18,18 +18,19 @@
 - baseline_profile: secure(shell=false, lint=false)
 - isolated_env: not-provided
 - current_stage: PHASE3_SUBMITTED
-- last_updated: 2026-10-09T09:00:00Z
-- last_updated_by_step: 单测取证完成：8 项 PASS、10 项 N/A；下一步命令类批次 A
+- last_updated: 2026-10-09T09:30:00Z
+- last_updated_by_step: 已准备命令类批次 A 清单（functional-tests/ai-reviewer-fixtures/command-batch-a.md）；等待用户提交清单并执行第一轮
 
 ## 下一步（Next Actions）
 
-1. 用户：提交并推送证据文件与进度文档（都是 md，不触发审查）。
-   - 提交前：`npx prettier --check docs/ai-reviewer-functional-test-progress.md docs/ai-reviewer-unit-evidence-8c84f45f.md`
-   - commit 消息：`docs: 补充锁定 SHA 的单测证据，故障注入与进程级异常用例记 PASS/N/A`
-   - `git add docs/ai-reviewer-functional-test-progress.md docs/ai-reviewer-unit-evidence-8c84f45f.md && git commit -m "docs: 补充锁定 SHA 的单测证据，故障注入与进程级异常用例记 PASS/N/A" && git push`
-2. 用户（Claude 准备好清单后）：命令类批次 A——在卫星 PR #304 顶层评论框按清单逐条发布命令（只需作者账号），Claude 批量读取 run 与回复；这些评论不需要提交。
-3. 用户（之后）：配置变体批次（在卫星 PR 上改 workflow，互不干扰的变体合并成一次提交）。`command_ack_reaction`（FT-117）是评论类事件，必须改 `main` 上的 workflow，需要单独确认。
-4. 缺陷 #301、#302、#303、#305 是否通知 ai-reviewer 团队：由用户决定；修复进入 develop 后以新 SHA 新开回归轮次复测（RETEST）。
+1. 用户：提交并推送命令批次清单（md，不触发审查）。
+   - commit 消息：`docs: 新增命令类批次 A 清单（help/configuration/pause/resume/对话等，卫星 PR #304）`
+   - `git add functional-tests/ai-reviewer-fixtures/command-batch-a.md docs/ai-reviewer-functional-test-progress.md && git commit -m "docs: 新增命令类批次 A 清单（help/configuration/pause/resume/对话等，卫星 PR #304）" && git push`
+2. 用户：按 `functional-tests/ai-reviewer-fixtures/command-batch-a.md` 执行第一轮（约 20 条评论的脚本，无需提交），发完后告诉 Claude “第一轮发完了”；Claude 按时间从 run 列表与评论读取并判定 FT-100~104、106、119~128、120、166、167、006、060。
+3. 用户：第二轮 pause/resume（2 个提交，commit 消息见清单）→ FT-104（暂停分支）、107~112；第三轮对话追问（GitHub 页面操作）→ FT-130、160、161、164；另有 FT-012（关闭再打开 PR）、FT-053（重跑 workflow）。
+4. Claude（不需要用户操作）：根据已有 run 日志整理 FT-290~295、298、299 的耗时、模型调用和 API 调用统计，以及 FT-248/249（无循环）、FT-163。
+5. 用户（之后）：配置变体批次（在卫星 PR 上改 workflow，互不干扰的变体合并成一次提交）。`command_ack_reaction`（FT-117）是评论类事件，必须改 `main` 上的 workflow，需要单独确认。
+6. 缺陷 #301、#302、#303、#305 是否通知 ai-reviewer 团队：由用户决定；修复进入 develop 后以新 SHA 新开回归轮次复测（RETEST）。
 
 ## 阶段与运行记录
 
