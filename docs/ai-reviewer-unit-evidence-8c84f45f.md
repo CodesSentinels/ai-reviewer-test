@@ -60,6 +60,33 @@ npx jest __tests__/github-only.test.ts __tests__/characterization __tests__/comm
 - `sanitize-model-output.test.ts` — sanitizeModelOutput — 裸文本引用标记 剥离用户实际遇到的乱码（citeturn0search0） — **passed**
 - `sanitize-model-output.test.ts` — sanitizeModelOutput — 分隔符包裹形式（PUA / Block Elements） 剥离孤立分隔符字符（包裹不完整时的兜底） — **passed**
 
+
+## 补充（2026-10-09 第二批）：陈旧 HEAD、长评论链、仓库树缓存隔离
+
+同样在锁定 SHA `8c84f45fab547821ecefbf56aabbf215eb9d7dbf` 的临时克隆上运行：`__tests__/review-head-freshness.test.ts`（26 个用例）、`repo-tree-cache-isolation.test.ts`、`conversation.test.ts`、`comment-chain-status.test.ts`、`conversation-dual-platform.test.ts`（合计 79 个用例，全部通过）。
+
+### FT-056 旧 HEAD 不覆盖新结果 / FT-057 陈旧事件安全跳过
+
+- `review-head-freshness.test.ts` — 分析后 HEAD 变化 → 不写 release notes / 摘要 / 行级评论 — **passed**
+- `review-head-freshness.test.ts` — 最危险的一条：不写 reviewed SHA marker（否则新 HEAD 会被当成已审过） — **passed**
+- `review-head-freshness.test.ts` — 逐文件审查（阶段四）执行期间推了新 commit → 行级评论与摘要都不写 — **passed**
+- `review-head-freshness.test.ts` — 作废提示不去读改写摘要评论（旧任务不得覆盖新任务结果） — **passed**
+- 真实环境补充：卫星 PR #304 上重跑旧 run（37891781681 的 attempt 2、3，对应旧 HEAD 88b8c0a6，当前 HEAD 为 6502eb86）日志为 `Skipped: headSha 88b8c0a6… already reviewed (idempotency key …)`，OpenAI 请求数 0，未产生任何评论。
+
+### FT-165 长评论链安全截断
+
+- `conversation.test.ts` — truncateConversationChain — 截断与压缩 超长对话保留最近内容并标注省略 — **passed**
+- `conversation.test.ts` — truncateConversationChain — 截断与压缩 预算极小也至少保留最新一轮 — **passed**
+- `conversation.test.ts` — truncateConversationChain — 截断与压缩 短对话原样返回 — **passed**
+
+### FT-178 仓库树缓存不跨 PR 污染
+
+- `repo-tree-cache-isolation.test.ts` — TEST-039：key 的每个维度都必须参与隔离 只改 ref → 不命中缓存，重新拉取 — **passed**
+- `repo-tree-cache-isolation.test.ts` — TEST-039：key 的每个维度都必须参与隔离 两个项目交替访问，各自拿到自己的文件列表 — **passed**
+- `repo-tree-cache-isolation.test.ts` — TEST-039：key 的每个维度都必须参与隔离 对照组：四维全同确实命中（证明上面不是「永远不命中」） — **passed**
+- `repo-tree-cache-isolation.test.ts` — API 失败 后续请求失败不破坏已有缓存，也不返回别人的数据 — **passed**
+- 说明：缓存 key 由 platform + owner + repo + ref 组成，ref 为各 PR 的 head，所以不同 PR 互不共用。
+
 ## 不适用或无证据的用例（N/A）
 
 - **FT-220/221/222/223**：OpenAI 429 / 5xx / 超时 / 空响应：锁定 SHA 没有对应单测；`src/bot.ts` 的 `createResponse` 用 `pRetry(…, {retries: openaiRetries})` 重试，失败后 `catch` 只告警并返回 `undefined`（静态阅读），但 `jest.config.json` 把 `p-retry` 替换成了 mock（`__mocks__/p-retry.js`），在单测里无法验证真实重试；本轮也无法对真实 OpenAI 做故障注入 → 记 N/A，列入报告“未覆盖风险”。
