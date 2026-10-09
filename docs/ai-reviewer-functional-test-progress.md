@@ -18,26 +18,23 @@
 - baseline_profile: secure(shell=false, lint=false)
 - isolated_env: pending
 - current_stage: PHASE3_SUBMITTED
-- last_updated: 2026-10-09T04:10:00Z
-- last_updated_by_step: 读取 Phase 3 之后的 full review（37876856228）：同样被 compare 300 文件上限截断；发现去重缺陷 #303；FT-245 PASS、FT-055 改为 FAIL；等待用户提交文档并建卫星 PR 补取证
+- last_updated: 2026-10-09T07:00:00Z
+- last_updated_by_step: 卫星 PR #304 取证完成：FT-058/093/094/177/037/091 PASS、FT-092 FAIL（缺陷 #305）；下一步清点剩余用例
 
 ## 下一步（Next Actions）
 
-1. 用户：先提交并推送本次更新的进度文档（只有 md，不会触发审查）。
+1. 用户：提交并推送本次更新的进度文档（只有 md，不触发审查）。
    - 提交前：`npx prettier --check docs/ai-reviewer-functional-test-progress.md`
-   - commit 消息：`docs: 记录 full review 结果，新增缺陷 #303（去重不识别行范围抖动），补充 #302 的 300 文件上限`
-   - `git add docs/ai-reviewer-functional-test-progress.md && git commit -m "docs: 记录 full review 结果，新增缺陷 #303（去重不识别行范围抖动），补充 #302 的 300 文件上限" && git push`
-2. 用户：为被 #302 挡住的 FT-058、FT-090~094、FT-177 建一个文件很少的“卫星 PR”（base 为 main，**不要**基于 PR #300 的分支）。每一步都是一次独立的 commit + push，等 pull_request run 完成后再做下一步，并把 PR 链接和每次 run 的链接发给 Claude：
-   - `git fetch origin && git switch -c test/ai-reviewer-develop-functional-20261008-b origin/main`
-   - 第 1 次（revert 基线）：`mkdir -p functional-tests/ai-reviewer-fixtures/workspace/revert && git show 4c47d40:functional-tests/ai-reviewer-fixtures/workspace/revert/rules.ts > functional-tests/ai-reviewer-fixtures/workspace/revert/rules.ts && git add functional-tests/ai-reviewer-fixtures/workspace/revert/rules.ts`；commit 消息：`test: 卫星 PR 基线，revert/rules.ts 初始版本（FT-058）`；`git push -u origin HEAD`，然后在 GitHub 上创建 PR（base=main，标题：`test: 卫星 PR（FT-058/090~094/177 取证，规避 #302）`）。
-   - 第 2 次（修改）：`git show 83140bc:functional-tests/ai-reviewer-fixtures/workspace/revert/rules.ts > functional-tests/ai-reviewer-fixtures/workspace/revert/rules.ts`；commit 消息：`test: rules.ts 改为 > 18（FT-058 修改）`；push。
-   - 第 3 次（回退）：`git show 4c47d40:functional-tests/ai-reviewer-fixtures/workspace/revert/rules.ts > functional-tests/ai-reviewer-fixtures/workspace/revert/rules.ts`；commit 消息：`test: rules.ts 回退为 >= 18（FT-058 回退）`；push。
-   - 第 4 次（噪音上限，FT-090~094）：`mkdir -p functional-tests/ai-reviewer-fixtures/workspace/noise && git show 88bf7db:functional-tests/ai-reviewer-fixtures/workspace/noise/many-issues.ts > functional-tests/ai-reviewer-fixtures/workspace/noise/many-issues.ts`；commit 消息：`test: 新增 noise/many-issues.ts，30 处问题超过评论上限（FT-090~094）`；push。
-   - 第 5 次（无法解析的导入，FT-177）：`mkdir -p functional-tests/ai-reviewer-fixtures/workspace/unresolved && git show 88bf7db:functional-tests/ai-reviewer-fixtures/workspace/unresolved/importer.ts > functional-tests/ai-reviewer-fixtures/workspace/unresolved/importer.ts`；commit 消息：`test: 新增 unresolved/importer.ts，无法解析的导入（FT-177）`；push。
-   - 以上每次提交前用 `git status --short` 确认只含这一个文件；切分支前请确保工作区已干净（先完成第 1 步）。
-3. Claude：逐个读取卫星 PR 的 run，判定 FT-058、FT-090~094、FT-177。
-4. 用户：之后做配置变体轮次（`simple-changes` 复测 FT-037、`no-path-filters` 验证 FT-074~076、`max-files`/`max-comments` 等，这些建议也在小文件数的卫星 PR 上做）、命令类用例（G/H 分区）、隔离环境相关用例。
-5. 用户（可并行）：确认基线偏差表，回答是否提供隔离环境；决定缺陷 #301、#302、#303 是否通知 ai-reviewer 团队。
+   - commit 消息：`docs: 记录卫星 PR 取证结果，新增缺陷 #305（review-dedup 丢弃同范围的不同问题）`
+   - `git add docs/ai-reviewer-functional-test-progress.md && git commit -m "docs: 记录卫星 PR 取证结果，新增缺陷 #305（review-dedup 丢弃同范围的不同问题）" && git push`
+2. 用户：回答三个环境问题（决定约 50 个用例的归属，未回答一律按“暂不提供”，相关 FT 标 BLOCKED）：
+   - GitLab：是否有可用的 GitLab 项目、Runner 和 PAT（涉及 28 项，FT-152/227/252/253/260~283）？
+   - 隔离环境：是否提供无业务密钥的隔离仓库/Environment（涉及 17 项，FT-184~188、191~202）？
+   - 额外账号：是否有 write / triage / read / 无权限 / fork 账号（涉及 FT-006、108、110、140~151、240~242 等）？
+3. Claude（不需要用户操作）：用 ai-reviewer 仓库在锁定 SHA 的单测，为 18 项 needs-injection / unit-evidence 用例（FT-040、061、062、150、182、203、220~230、296、297 等）取证或判 N/A，并写明理由。
+4. 用户（Claude 准备好清单后）：命令类批次 A——在卫星 PR #304 的顶层评论框按清单逐条发布命令（help / configuration / review / summary / pause / resume / 大小写 / 邮箱 mention / 超长命令 / 速率限制 / 对话追问等，约 30 项，只需作者账号），Claude 批量读取 run 与回复；这些评论不需要提交。
+5. 用户（之后）：配置变体批次（在卫星 PR 上改 workflow，多个互不干扰的变体合并成一次提交）：`disable_release_notes`、`disable_review`、`language`、`bot_icon`、`bot_name`、`review_comment_lgtm`、`no-path-filters`、`max-files`、依赖分析开关、`web-search-off`、`lint_report_path`（FT-204~212、247）等。`command_ack_reaction`（FT-117）是评论类事件，必须改 `main` 上的 workflow，需要单独确认。
+6. 缺陷 #301、#302、#303、#305 是否通知 ai-reviewer 团队：由用户决定；修复进入 develop 后以新 SHA 新开回归轮次复测（RETEST）。
 
 ## 阶段与运行记录
 
@@ -46,6 +43,11 @@
 | Phase 1 | `test/ai-reviewer-develop-functional-20261008` | `4c47d40a` | [#300](https://github.com/CodesSentinels/ai-reviewer-test/pull/300) | [run 37742626690](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37742626690) | 2026-10-08T07:18Z（耗时约 6m14s） | SUBMITTED |
 | Phase 2 | `test/ai-reviewer-develop-functional-20261008` | `83140bc0` | 同一 PR | [run 37874287998](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37874287998) | 2026-10-09T02:22Z（约 1m20s） | SUBMITTED |
 | Phase 3 | `test/ai-reviewer-develop-functional-20261008` | `88bf7db4` | 同一 PR | [run 37875759051](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37875759051) | 2026-10-09T02:41Z（约 1m45s，仅处理 30/62） | SUBMITTED |
+| 卫星 PR #304 首次审查 | `test/ai-reviewer-develop-functional-20261008-b` | `584035f6` | [#304](https://github.com/CodesSentinels/ai-reviewer-test/pull/304)（base=main） | [run 37879664501](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37879664501) | 2026-10-09T03:31Z | SUBMITTED |
+| 卫星 PR 修改 / 回退（rules.ts） | 同上 | `6bc25886` / `de1f89fd` | #304 | [run 37879780113](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37879780113) / [run 37880384641](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37880384641) | 2026-10-09T03:32Z / 03:41Z | SUBMITTED |
+| 卫星 PR 变体：simple-changes（FT-037） | 同上 | `de707f8c` / `3f91f32a` | #304 | [run 37890813340](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37890813340) / [run 37891138748](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37891138748) | 2026-10-09T05:54Z / 05:58Z | SUBMITTED |
+| 卫星 PR 变体：max_review_comments 2 / 1（FT-091） | 同上 | `d76fd3f1` / `88b8c0a6` | #304 | [run 37891395527](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37891395527) / [run 37891781681](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37891781681) | 2026-10-09T06:01Z / 06:06Z | SUBMITTED |
+| 卫星 PR 还原变体 + full review（FT-092） | 同上 | `a6f81c14` | #304 | [run 37892154642](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37892154642)（跳过）/ [run 37892210969](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37892210969) | 2026-10-09T06:10Z | SUBMITTED |
 
 ## 准备步骤清单
 
@@ -64,7 +66,7 @@
 
 ## FT 状态总表
 
-汇总：共 226 项；PASS 55 / FAIL 3 / BLOCKED 0 / N/A 0 / 其余 168（NOT_READY 155、SUBMITTED 13）。
+汇总：共 226 项；PASS 61 / FAIL 4 / BLOCKED 0 / N/A 0 / 其余 161（NOT_READY 154、SUBMITTED 7）。
 
 ### A. 环境与启动
 
@@ -111,7 +113,7 @@
 | FT-034 | 不评论不存在或未变更行 | fixture | e2e | yes | no | PASS | [Workflow](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37874287998) / [评论](https://github.com/CodesSentinels/ai-reviewer-test/pull/300#discussion_r4226033704) | - | 2026-10-09 | Phase 2 的 6 条评论全部落在本次 diff 内；旧缺陷行（inventory.ts reserve、pricing.ts 折扣符号）未被重复评论 |
 | FT-035 | 建议代码格式正确 | fixture | e2e | yes | no | PASS | [评论](https://github.com/CodesSentinels/ai-reviewer-test/pull/300#discussion_r4216981092) / [评论](https://github.com/CodesSentinels/ai-reviewer-test/pull/300#discussion_r4216981106) | - | 2026-10-08 | 修复建议为 <details> 内格式正确的 diff 代码块 |
 | FT-036 | 默认忽略轻微样式问题 | fixture | e2e | yes | no | FAIL | [评论](https://github.com/CodesSentinels/ai-reviewer-test/pull/300#discussion_r4226033711) / [Workflow](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37874287998) / [缺陷 #301](https://github.com/CodesSentinels/ai-reviewer-test/issues/301) | [#301](https://github.com/CodesSentinels/ai-reviewer-test/issues/301) | 2026-10-09 | Phase 2 仅格式化改动：nits.ts triage 为 NEEDS_REVIEW（预期 APPROVED）并收到 🔴严重评论，评论称“新增的命名”但 diff 无命名变化；缺陷 #301，状态 WAITING_FOR_FIX |
-| FT-037 | review_simple_changes=true 生效 | fixture | e2e | yes | no | NOT_READY | - | - | 2026-10-08 | |
+| FT-037 | review_simple_changes=true 生效 | fixture | e2e | yes | no | PASS | [变体 run](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37891138748) / [默认配置对照 run](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37875759051) / [PR #304](https://github.com/CodesSentinels/ai-reviewer-test/pull/304) | - | 2026-10-09 | 同一类改动（greeter.ts 仅加一行文档注释）：默认配置下 triage=APPROVED、未进入审查；卫星 PR 打开 review_simple_changes=true 后日志无 triage 步骤，文件进入 summarize + reviewing（LGTM，不发布） |
 | FT-038 | review_comment_lgtm=false 生效 | external-observation | e2e | yes | no | NOT_READY | - | - | 2026-10-08 | |
 | FT-039 | review_comment_lgtm=true 生效 | external-observation | e2e | yes | no | NOT_READY | - | - | 2026-10-08 | |
 | FT-040 | 非法模型输出安全处理 | external-observation | needs-injection | yes | no | NOT_READY | - | - | 2026-10-08 | |
@@ -128,7 +130,7 @@
 | FT-055 | 相同 finding 不重复发布 | external-observation | e2e | yes | no | FAIL | [Workflow](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37876856228) / [重复评论](https://github.com/CodesSentinels/ai-reviewer-test/pull/300#discussion_r4226191053) / [缺陷 #303](https://github.com/CodesSentinels/ai-reviewer-test/issues/303) | [#303](https://github.com/CodesSentinels/ai-reviewer-test/issues/303) | 2026-10-09 | 去重只认完全相同的行范围：large-module.ts transform40/80/120 已有未解决评论（240-243 等），新评论范围差 1 行（240-244 等）仍被重复发布，shell-bait.ts 同理；缺陷 #303。此前范围完全相同时能去重（token-check.ts:9-10 等）的 PASS 证据保留但覆盖不全 |
 | FT-056 | 旧 HEAD 不覆盖新结果 | multi-phase | e2e | yes | no | NOT_READY | - | - | 2026-10-08 | |
 | FT-057 | 陈旧事件安全跳过 | multi-phase | e2e | yes | no | NOT_READY | - | - | 2026-10-08 | |
-| FT-058 | 修改回退后状态一致 | multi-phase | e2e | yes | no | SUBMITTED | [Workflow](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37876856228) | - | 2026-10-09 | full review 同样被截断：PR 共 344 个变更文件，日志只检查了 300 个（GitHub compare 接口上限），排序靠后的 noise/、revert/、unresolved/、orders/、shared/ 等 44 个文件被静默丢弃（#302 补充证据）；需用文件数较少的卫星 PR 取证 |
+| FT-058 | 修改回退后状态一致 | multi-phase | e2e | yes | no | PASS | [PR #304](https://github.com/CodesSentinels/ai-reviewer-test/pull/304) / [run 修改](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37879780113) / [run 回退](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37880384641) / [评论](https://github.com/CodesSentinels/ai-reviewer-test/pull/304#discussion_r4226365432) | - | 2026-10-09 | 卫星 PR：v1 首次审查无评论 → 改为 `> 18` 后增量审查发布 🔴 评论指出 18 岁被排除 → 回退为 `>= 18` 后增量审查（Will review from 6bc25886）无新评论；marker 累计三个 commit；旧评论被 GitHub 标为 outdated 但仍 unresolved（bot 未自动解决） |
 | FT-059 | full review 执行全量审查 | manual-command | e2e | yes | no | PASS | [命令评论](https://github.com/CodesSentinels/ai-reviewer-test/pull/300#issuecomment-6056404288) / [回复](https://github.com/CodesSentinels/ai-reviewer-test/pull/300#issuecomment-6056409306) / [Workflow](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37753470889) | - | 2026-10-08 | 日志 Will review full diff from the base commit: 8e0f9177，审查 18 个文件，dispatcher outcome executed/ok:true，bot 回复 Full review finished |
 | FT-060 | summary 只重建摘要 | manual-command | e2e | yes | no | NOT_READY | - | - | 2026-10-08 | |
 | FT-061 | 部分评论失败时状态可解释 | manual-command | needs-injection | yes | no | NOT_READY | - | - | 2026-10-08 | |
@@ -157,10 +159,10 @@
 | FT | 标题 | type | coverage | baselineMeaningful | 隔离环境 | 状态 | 证据链接 | 缺陷 Issue | 最后更新 | 备注 |
 |---|---|---|---|---|---|---|---|---|---|---|
 | FT-090 | max_review_comments 生效 | fixture | e2e | yes | no | PASS | [Workflow](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37742626690) / [Review](https://github.com/CodesSentinels/ai-reviewer-test/pull/300#pullrequestreview-5453143957) | - | 2026-10-08 | max_review_comments=20：57 条 finding → 发布 20、截断 37（默认值下观察；变体 5 仍可补测） |
-| FT-091 | 超限时优先保留高严重度问题 | fixture | e2e | yes | no | SUBMITTED | [Workflow](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37876856228) | - | 2026-10-09 | full review 同样被截断：PR 共 344 个变更文件，日志只检查了 300 个（GitHub compare 接口上限），排序靠后的 noise/、revert/、unresolved/、orders/、shared/ 等 44 个文件被静默丢弃（#302 补充证据）；需用文件数较少的卫星 PR 取证 |
-| FT-092 | 截断后不重复评论 | fixture | e2e | yes | no | SUBMITTED | [Workflow](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37876856228) | - | 2026-10-09 | full review 同样被截断：PR 共 344 个变更文件，日志只检查了 300 个（GitHub compare 接口上限），排序靠后的 noise/、revert/、unresolved/、orders/、shared/ 等 44 个文件被静默丢弃（#302 补充证据）；需用文件数较少的卫星 PR 取证 |
-| FT-093 | 相似 finding 正确去重 | fixture | e2e | yes | no | SUBMITTED | [Workflow](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37876856228) | - | 2026-10-09 | full review 同样被截断：PR 共 344 个变更文件，日志只检查了 300 个（GitHub compare 接口上限），排序靠后的 noise/、revert/、unresolved/、orders/、shared/ 等 44 个文件被静默丢弃（#302 补充证据）；需用文件数较少的卫星 PR 取证 |
-| FT-094 | 摘要与评论数量合理 | fixture | e2e | yes | no | SUBMITTED | [Workflow](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37876856228) | - | 2026-10-09 | full review 同样被截断：PR 共 344 个变更文件，日志只检查了 300 个（GitHub compare 接口上限），排序靠后的 noise/、revert/、unresolved/、orders/、shared/ 等 44 个文件被静默丢弃（#302 补充证据）；需用文件数较少的卫星 PR 取证 |
+| FT-091 | 超限时优先保留高严重度问题 | fixture | e2e | yes | no | PASS | [run](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37891781681) / [评论](https://github.com/CodesSentinels/ai-reviewer-test/pull/304#discussion_r4227141938) / [PR #304](https://github.com/CodesSentinels/ai-reviewer-test/pull/304) | - | 2026-10-09 | max_review_comments=1：日志 `noise-control: 3 findings → posting 1, truncated 2 low-priority`；保留的评论为 🔴 严重（最高档），被截断的不可能高于该档（注意 bot 把多数问题都标成 🔴，区分度有限，见 #301 观察项） |
+| FT-092 | 截断后不重复评论 | fixture | e2e | yes | no | FAIL | [run 截断](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37891781681) / [run full review](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37892210969) / [重复评论](https://github.com/CodesSentinels/ai-reviewer-test/pull/304#discussion_r4227177445) / [缺陷 #305](https://github.com/CodesSentinels/ai-reviewer-test/issues/305) | [#305](https://github.com/CodesSentinels/ai-reviewer-test/issues/305) | 2026-10-09 | 截断后 full review：补发评论重复了已发布的 loadAll 问题；模型生成的 SQL 注入 + 明文令牌评论因与另一条同为 1-17 范围被 `[review-dedup] merged 1 duplicate comment(s)` 丢弃，从未发布；缺陷 #305，WAITING_FOR_FIX |
+| FT-093 | 相似 finding 正确去重 | fixture | e2e | yes | no | PASS | [PR #304](https://github.com/CodesSentinels/ai-reviewer-test/pull/304) / [run](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37879664501) / [评论](https://github.com/CodesSentinels/ai-reviewer-test/pull/304#discussion_r4226359316) | - | 2026-10-09 | noise/many-issues.ts 含 30 个同类缺陷（10 eval、10 `==`、10 除零）：合并为 3 条评论，没有逐个重复；行范围很大（3-120、7-119、11-119），锚点不够精确 |
+| FT-094 | 摘要与评论数量合理 | fixture | e2e | yes | no | PASS | [PR #304](https://github.com/CodesSentinels/ai-reviewer-test/pull/304) / [摘要](https://github.com/CodesSentinels/ai-reviewer-test/pull/304#issuecomment-6073707951) | - | 2026-10-09 | 30 个缺陷只产生 3 条行级评论 + 1 条摘要，数量合理，没有刷屏 |
 | FT-095 | 简单改动不产生大量噪音 | fixture | e2e | yes | no | PASS | [Workflow](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37875759051) | - | 2026-10-09 | greeter.ts 只加了一行文档注释：triage 为 APPROVED，没有评论 |
 
 ### G. 命令系统
@@ -242,7 +244,7 @@
 | FT-174 | 支持目录 index 导入 | fixture | e2e | yes | no | PASS | [Workflow](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37874287998) / [评论](https://github.com/CodesSentinels/ai-reviewer-test/pull/300#discussion_r4226033719) | - | 2026-10-09 | index-user.ts:5 的目录 index 导入（../shared）被列为受影响调用方，shared/index.ts 作为 barrel 也被识别 |
 | FT-175 | 关闭依赖分析后安全降级 | external-observation | e2e | yes | no | NOT_READY | - | - | 2026-10-08 | |
 | FT-176 | max_dependency_files 生效 | external-observation | e2e | yes | no | NOT_READY | - | - | 2026-10-08 | |
-| FT-177 | 无法解析依赖时安全降级 | fixture | e2e | yes | no | SUBMITTED | [Workflow](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37876856228) | - | 2026-10-09 | full review 同样被截断：PR 共 344 个变更文件，日志只检查了 300 个（GitHub compare 接口上限），排序靠后的 noise/、revert/、unresolved/、orders/、shared/ 等 44 个文件被静默丢弃（#302 补充证据）；需用文件数较少的卫星 PR 取证 |
+| FT-177 | 无法解析依赖时安全降级 | fixture | e2e | yes | no | PASS | [PR #304](https://github.com/CodesSentinels/ai-reviewer-test/pull/304) / [run](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37879664501) / [评论](https://github.com/CodesSentinels/ai-reviewer-test/pull/304#discussion_r4226359333) | - | 2026-10-09 | importer.ts 含无法解析的相对与别名导入：依赖分析正常结束（3 个文件、0 个跨文件引用，不报错），评论明确指出两个未解析模块 |
 | FT-178 | 仓库树缓存不跨 PR 污染 | external-observation | e2e | yes | no | NOT_READY | - | - | 2026-10-08 | |
 | FT-179 | 当前技术栈依赖分析正确 | fixture | e2e | yes | no | PASS | [Workflow](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37874287998) / [评论](https://github.com/CodesSentinels/ai-reviewer-test/pull/300#discussion_r4226033719) | - | 2026-10-09 | Vue SFC OrderCard.vue:7 作为调用方被识别（依赖分析 step 6：6 个文件分析、5 处跨文件引用） |
 
@@ -376,6 +378,7 @@
 
 | 缺陷 Issue | FT | ai-reviewer SHA | 失败 commit | 首次失败证据 | 状态 |
 |---|---|---|---|---|---|
+| [#305](https://github.com/CodesSentinels/ai-reviewer-test/issues/305) | FT-092 | `8c84f45f` | 卫星 PR `a6f81c14` | [run 37892210969](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37892210969)、[重复评论 r4227177445](https://github.com/CodesSentinels/ai-reviewer-test/pull/304#discussion_r4227177445) | WAITING_FOR_FIX |
 | [#303](https://github.com/CodesSentinels/ai-reviewer-test/issues/303) | FT-055 | `8c84f45f` | `bd81fe56` | [run 37876856228](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37876856228)、[重复评论 r4226191053](https://github.com/CodesSentinels/ai-reviewer-test/pull/300#discussion_r4226191053) | WAITING_FOR_FIX |
 | [#302](https://github.com/CodesSentinels/ai-reviewer-test/issues/302) | FT-078 | `8c84f45f` | `88bf7db4` | [run 37875759051](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37875759051) | WAITING_FOR_FIX |
 | [#301](https://github.com/CodesSentinels/ai-reviewer-test/issues/301) | FT-036 | `8c84f45f` | `83140bc0` | [run 37874287998](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37874287998)、[评论 r4226033711](https://github.com/CodesSentinels/ai-reviewer-test/pull/300#discussion_r4226033711) | WAITING_FOR_FIX |
@@ -413,6 +416,7 @@
 
 ## 变更日志（倒序，只追加）
 
+- 2026-10-09T07:00:00Z：卫星 PR #304（base=main，规避 #302）取证完成。首次审查/修改/回退/变体 simple-changes/变体 max_review_comments 2→1/还原 + full review 共 9 个 run；新增 PASS 6 项（FT-058/093/094/177/037/091），FT-092 FAIL 并创建缺陷 [#305](https://github.com/CodesSentinels/ai-reviewer-test/issues/305)（review-dedup 把同范围的不同问题当重复丢弃，SQL 注入未发布）；原因：用户切回主测试分支，要求补写进度文档。
 - 2026-10-09T04:10:00Z：用户在 PR #300 发布 full review（HEAD bd81fe56）。读取 [run 37876856228](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37876856228)：ref 8c84f45f…，约 2 分钟；检查路径恰好 300 个而 PR 共 344 个文件（compare 接口 300 上限），44 个文件被静默丢弃（补充到 #302）；发布 9 条评论，其中 large-module.ts / shell-bait.ts 与已有未解决评论范围差 1 行而重复发布 → 新缺陷 [#303](https://github.com/CodesSentinels/ai-reviewer-test/issues/303)，FT-055 由 PASS 改为 FAIL；FT-245 PASS（注入被无视）。原因：用户提供 run 链接。
 - 2026-10-09T03:40:00Z：用户提交并推送 Phase 3（88bf7db）。读取 [run 37875759051](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37875759051)：增量审查（Will review from 83140bc0）只处理 compare 列表的前 30/62 个文件，28 个 many/、noise/、revert/、unresolved/ 被静默丢弃且 HEAD 仍记为已审查；根因为 `compareDiff` 的 `compareCommits` 未分页。新增 PASS 5 项（FT-072/073/081/095/246），FT-078 FAIL，创建缺陷 [#302](https://github.com/CodesSentinels/ai-reviewer-test/issues/302)，11 项待 full review 补取证。原因：用户提供 run 链接。
 - 2026-10-09T03:10:00Z：用户提交 Phase 2（83140bc0）。读取 [run 37874287998](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37874287998)（pull_request / pr_synchronize，固定 SHA，Will review from 3ab89ae5，8 个文件，delivered 6）：新增 PASS 10 项（FT-034/051/079/080/170/171/172/173/174/179）；FT-036 FAIL，创建缺陷 [#301](https://github.com/CodesSentinels/ai-reviewer-test/issues/301)；FT-081 因 GitHub 未识别为重命名保持 SUBMITTED，Phase 3 增加 100% 相同内容的重命名；原因：用户提供 run 链接。
