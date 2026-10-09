@@ -11,3 +11,5 @@ export function greet(options: GreetOptions): string {
 export function greetAll(names: string[]): string[] {
   return names.map((name) => greet({ name }));
 }
+
+// touch 5
