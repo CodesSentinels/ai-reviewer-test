@@ -1,0 +1,13 @@
+{
+  "results": [
+    {"tool": "eslint", "toolVersion": "9.0.0", "file": "functional-tests/ai-reviewer-fixtures/workspace/lint/lint-issues.ts", "line": 2, "column": 9, "severity": "error", "ruleId": "no-unused-vars", "message": "VALID-ENTRY 'unused' is assigned a value but never used."},
+    {"tool": "eslint", "toolVersion": "9.0.0", "file": "/etc/passwd", "line": 1, "column": 1, "severity": "error", "ruleId": "x/abs", "message": "ABS-PATH-ENTRY must be dropped"},
+    {"tool": "eslint", "toolVersion": "9.0.0", "file": "../../etc/passwd", "line": 1, "column": 1, "severity": "error", "ruleId": "x/dotdot", "message": "DOTDOT-ENTRY must be dropped"},
+    {"tool": "eslint", "toolVersion": "9.0.0", "file": "functional-tests/ai-reviewer-fixtures/workspace/lint/lint-issues.ts", "line": 3, "column": 3, "severity": "fatal", "ruleId": "x/severity", "message": "BAD-SEVERITY-ENTRY must be dropped"},
+    {"tool": "eslint", "toolVersion": "9.0.0", "file": "functional-tests/ai-reviewer-fixtures/workspace/lint/lint-issues.ts", "line": 0, "column": 1, "severity": "error", "ruleId": "x/zero-line", "message": "ZERO-LINE-ENTRY must be dropped"},
+    {"tool": "eslint", "toolVersion": "9.0.0", "file": "functional-tests/ai-reviewer-fixtures/workspace/lint/lint-issues.ts", "line": 2, "column": -1, "severity": "error", "ruleId": "x/negative-column", "message": "NEGATIVE-COLUMN-ENTRY must be dropped"}
+  ],
+  "toolSummaries": [],
+  "durationMs": 100,
+  "filesScanned": 1
+}

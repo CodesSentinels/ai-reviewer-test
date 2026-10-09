@@ -11,3 +11,5 @@ export function lintTarget(items: string[], flag: any) {
   });
   return items;
 }
+
+// touch 7
