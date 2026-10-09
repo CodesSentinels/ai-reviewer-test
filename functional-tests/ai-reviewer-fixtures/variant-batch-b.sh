@@ -39,7 +39,7 @@ setup_worktree() {
     else
       git -C "$ORIG" worktree add -q -b "$BRANCH" "$WT" origin/main
     fi
-    say "[setup] 已创建 worktree: $WT（分支 $BRANCH）"
+    say "[setup] 已创建 worktree: ${WT}（分支 ${BRANCH}）"
   fi
   cd "$WT"
 }
@@ -111,7 +111,7 @@ run_stage() { [ "$1" -ge "$START" ] && [ "$1" -le "$STOP" ]; }
 
 # ------------------------------------------------------------------ 开始
 : > "$LOG"
-say "变体批次 B 开始：$(date -u +%FT%TZ)（START=$START STOP=$STOP）"
+say "变体批次 B 开始：$(date -u +%FT%TZ)（START=$START STOP=${STOP}）"
 setup_worktree
 
 # 阶段 1：variant A + 基础夹具，创建 PR
@@ -237,6 +237,29 @@ if run_stage 15; then
   git push -q -u origin "$BRANCH"
   say "[stage 15] 已推送空提交 $(git rev-parse --short HEAD)"
   wait_run 15 "$(git rev-parse HEAD)"
+fi
+
+# 阶段 16：FT-211/247 重做——必须让 lint-issues.ts 的第 2 行进入本次 diff，注入报告才会进入审查提示词
+if run_stage 16; then
+  wf "lint_report_path=$LR/injection.json"
+  perl -pi -e 's/= 42;/= 43;/' "$FIX/lint/lint-issues.ts"
+  printf '\nexport function addedLater(input: any) {\n  return input == null ? [] : [input];\n}\n' >> "$FIX/lint/lint-issues.ts"
+  commit_push_wait 16 "test: variant O，修改 lint-issues.ts 第 2 行使其进入审查，配合含提示词注入的 lint 报告（FT-211/247 重做）"
+fi
+
+# 阶段 17：FT-212 重做——让 pricing.ts 第 11 行（循环）进入本次 diff，与 dedupe 报告同一行
+if run_stage 17; then
+  wf "lint_report_path=$LR/dedupe.json"
+  perl -pi -e 's/i\+\+\) \{/i += 1) {/' "$FIX/orders/pricing.ts"
+  commit_push_wait 17 "test: variant P，修改 pricing.ts 循环行并配合 dedupe 报告，观察 lint 与 AI finding 是否重复（FT-212 重做）"
+fi
+
+# 阶段 18：FT-074 重做——默认排除规则是根目录的 dist/**，嵌套的 workspace/dist 不匹配，要放在仓库根目录
+if run_stage 18; then
+  wf 'lint_report_path=@delete'
+  mkdir -p dist
+  git show "$P3:$FIX/dist/output.js" > dist/output.js
+  commit_push_wait 18 "test: variant Q，仓库根目录新增 dist/output.js，验证默认排除 dist/**（FT-074 重做）"
 fi
 
 say "变体批次 B 完成：$(date -u +%FT%TZ)，PR #$(pr_number)。日志：$LOG"
