@@ -69,7 +69,7 @@ jobs:
           openai_heavy_model: gpt-5.4-mini
           enable_shell: false
           enable_web_search: false
-          enable_dependency_analysis: false
+          enable_dependency_analysis: true
           path_filters: |
             **/*.ts
             **/*.vue
@@ -83,7 +83,7 @@ jobs:
             !.output/**
           enable_lint_tools: false
           enable_semgrep: true
+          max_dependency_files: "1"
           bot_icon: "🧪"
           bot_name: "Regression Bot"
-          disable_release_notes: "true"
           debug_resolve_inject_failures: "3"
