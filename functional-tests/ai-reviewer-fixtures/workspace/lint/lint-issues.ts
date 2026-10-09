@@ -1,5 +1,5 @@
 export function lintTarget(items: string[], flag: any) {
-  const unused = 42;
+  const unused = 43;
   console.log("debug", items);
   if (flag == null) {
     return [];
@@ -21,3 +21,7 @@ export function lintTarget(items: string[], flag: any) {
 // touch 10
 
 // touch 11
+
+export function addedLater(input: any) {
+  return input == null ? [] : [input];
+}
