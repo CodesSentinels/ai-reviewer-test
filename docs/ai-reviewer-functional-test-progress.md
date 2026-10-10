@@ -19,11 +19,11 @@
 - isolated_env: not-provided
 - current_stage: PHASE3_SUBMITTED
 - last_updated: 2026-10-10T08:00:00Z
-- last_updated_by_step: FT-117/118/168/249 取证完成并判定 PASS；取证阶段结束，待补全最终报告
+- last_updated_by_step: FT-117/118/168/249 取证完成并判定 PASS；取证阶段结束；最终报告已补全（含发布建议），待用户评审并决定 FT-213
 
 ## 下一步（Next Actions）
 
-1. Claude：补全 docs/ai-reviewer-functional-test-report.md（含发布建议，FT-300 才能通过），整理 BLOCKED / N/A 的未覆盖风险，并对 FT-213 给出判定建议；随后刷新 Issue #299。
+1. 用户：决定 FT-213（建议：基线下判 PASS——action 代码来自固定 SHA 的独立 checkout，shell/lint 关闭时 PR 代码不被执行；shell/lint 开启的情形归入 FT-184~203 的 BLOCKED，并在报告“未覆盖风险”里注明）。告知 Claude 后再改状态。
 2. 用户：缺陷 #301、#302、#303、#305、#307、#308、#309、#311 是否通知 ai-reviewer 团队；修复进入 develop 后以新 SHA 新开回归轮次复测（RETEST）。
 
 ## 阶段与运行记录
@@ -411,6 +411,7 @@
 
 ## 变更日志（倒序，只追加）
 
+- 2026-10-10T09:00:00Z：补全 docs/ai-reviewer-functional-test-report.md（汇总 PASS 146 / FAIL 8 / BLOCKED 32 / N/A 37 / 其他 3，缺陷分级，未覆盖风险，发布建议：修复 #302/#305/#303 并复测后再发布）。FT-300 待用户评审报告后判定；FT-213 待用户决定。
 - 2026-10-10T08:00:00Z：变体批次 B 阶段 16~18 读取完成（变体 PR #310，09:2x–09:31 UTC）：FT-211/247（lint 报告里的提示词注入被当作 finding 而非指令，无泄密）、FT-212（lint 与 AI 同行 finding 合并为 1 条评论）、FT-074（根目录 dist 被默认排除）判 PASS。新增 ack-reaction-batch.sh；修正 no-ack-reaction 变体取值为 `off`（源码：空/off/none 表示禁用）。GitHub Actions 的评论事件不是 App webhook，FT-118/168/249 改用重跑 Actions run 测试。原因：用户同意临时改 main，并反馈找不到 Recent Deliveries。
 - 2026-10-09T12:00:00Z：配置变体批次 B（变体 PR #310，15 阶段，08:52–09:11 UTC）读取完成：新增 PASS 26 项（FT-007/019/020/021/023/024/039/070/071/075/076/077/082/175/176/181/204~210/243/244），FT-005 FAIL（缺陷 [#311](https://github.com/CodesSentinels/ai-reviewer-test/issues/311)：缺少 OPENAI_API_KEY 仍以 success 结束）；FT-074（嵌套 dist 不匹配 `!dist/**`）、FT-211/247（lint-issues.ts 仅改注释被 APPROVED，注入报告未进入提示词）、FT-212（模型对 pricing.ts 无评论）需重做，脚本增加阶段 16~18。**更正 #302**：根因为增量结果与 compare(base…head) 取交集且 compare 最多 300 个文件，不是 per_page=30（已在 #302 补充评论）。原因：用户报告脚本运行结束。
 - 2026-10-09T11:00:00Z：对话追问（third-batch.ts:2 线程三次回复 + pause-probe.ts 新线程）、FT-012（reopened → 幂等跳过）、FT-053（重跑 attempt 2/3 → 幂等跳过）读取完成，新增 PASS 12 项（FT-012/022/038/053/056/057/130/160/161/164/165/178，其中 056/057/165/178 含单测证据）；FT-118/168/249 因缺少 App 设置页权限记 BLOCKED。新增 variant-batch-b.sh 与证据文件补充。原因：用户报告三件事做完。
