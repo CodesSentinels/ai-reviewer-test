@@ -83,5 +83,4 @@ jobs:
             !.output/**
           enable_lint_tools: false
           enable_semgrep: true
-          command_ack_reaction: "off"
           debug_resolve_inject_failures: "3"
