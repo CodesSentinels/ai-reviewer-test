@@ -34,8 +34,8 @@
 | 状态    | 数量 | 说明                                                                                                                                                                                  |
 | ------- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | PASS    | 158  | 均有真实 run / 评论 / 日志或单测证据，见进度文档总表                                                                                                                                  |
-| FAIL    | 8    | FT-005/036/055/078/092/102/104/128，对应 8 个缺陷 Issue                                                                                                                               |
-| BLOCKED | 22   | 无额外账号 4 项（FT-146、147、149、151）+ 无隔离环境 18 项（FT-184~188、191~203）；不算通过                                                                                           |
+| FAIL    | 9    | FT-005/036/055/078/092/102/104/128/147，对应 9 个缺陷 Issue                                                                                                                           |
+| BLOCKED | 21   | 无额外账号 3 项（FT-146、149、151）+ 无隔离环境 18 项（FT-184~188、191~203）；不算通过                                                                                                |
 | N/A     | 37   | GitLab 28 项（后续单独测试）；OpenAI 重试/超时/空响应 FT-220~223、非 JSON 协议 FT-224/225、web_search 失败降级 FT-182、并发限制 FT-296/297（锁定 SHA 无对应单测且无法在真实环境注入） |
 | 其余    | 1    | SUBMITTED 1（FT-295，API 调用统计不完整）。FT-213 经用户确认判 PASS，FT-300 即本报告判 PASS                                                                                           |
 
@@ -43,16 +43,17 @@
 
 失败 SHA 均为 `8c84f45f`，状态均为 WAITING_FOR_FIX，修复后以新 SHA 开新轮次复测（失败证据保留）。
 
-| 严重度（测试方判断） | FT     | 缺陷                                                                  | 现象                                                                                                               |
-| -------------------- | ------ | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| 高                   | FT-078 | [#302](https://github.com/CodesSentinels/ai-reviewer-test/issues/302) | 一次 push 改动 62 个文件时增量审查只处理 compare 列表前 30 个，其余文件被静默漏审（compare API 另有 300 文件上限） |
-| 高                   | FT-092 | [#305](https://github.com/CodesSentinels/ai-reviewer-test/issues/305) | 同行范围的不同问题被合并，SQL 注入、明文令牌评论被静默丢弃；已发布问题却重复发布                                   |
-| 中                   | FT-055 | [#303](https://github.com/CodesSentinels/ai-reviewer-test/issues/303) | 去重只认完全相同的行范围，同一问题换范围后重复发布                                                                 |
-| 中                   | FT-005 | [#311](https://github.com/CodesSentinels/ai-reviewer-test/issues/311) | OPENAI_API_KEY 为空时 run 仍 success，只有一条 warning，无明确失败                                                 |
-| 中                   | FT-104 | [#309](https://github.com/CodesSentinels/ai-reviewer-test/issues/309) | HEAD 已审查过时 `review` 退回到从 base 全量重审                                                                    |
-| 中                   | FT-036 | [#301](https://github.com/CodesSentinels/ai-reviewer-test/issues/301) | 仅格式化改动被判 NEEDS_REVIEW 并给出🔴严重评论（预期忽略轻微样式）                                                 |
-| 低                   | FT-102 | [#307](https://github.com/CodesSentinels/ai-reviewer-test/issues/307) | `@codesentinel-review-bot help` 无回复无 reaction，日志 ignored（no bot mention）                                  |
-| 低（已知限制）       | FT-128 | [#308](https://github.com/CodesSentinels/ai-reviewer-test/issues/308) | 命令限流为进程内内存，Actions 每次一个进程，12 条连发全部执行                                                      |
+| 严重度（测试方判断） | FT     | 缺陷                                                                  | 现象                                                                                                                                                   |
+| -------------------- | ------ | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 高                   | FT-078 | [#302](https://github.com/CodesSentinels/ai-reviewer-test/issues/302) | 一次 push 改动 62 个文件时增量审查只处理 compare 列表前 30 个，其余文件被静默漏审（compare API 另有 300 文件上限）                                     |
+| 高                   | FT-092 | [#305](https://github.com/CodesSentinels/ai-reviewer-test/issues/305) | 同行范围的不同问题被合并，SQL 注入、明文令牌评论被静默丢弃；已发布问题却重复发布                                                                       |
+| 中                   | FT-055 | [#303](https://github.com/CodesSentinels/ai-reviewer-test/issues/303) | 去重只认完全相同的行范围，同一问题换范围后重复发布                                                                                                     |
+| 中                   | FT-005 | [#311](https://github.com/CodesSentinels/ai-reviewer-test/issues/311) | OPENAI_API_KEY 为空时 run 仍 success，只有一条 warning，无明确失败                                                                                     |
+| 中                   | FT-104 | [#309](https://github.com/CodesSentinels/ai-reviewer-test/issues/309) | HEAD 已审查过时 `review` 退回到从 base 全量重审                                                                                                        |
+| 中                   | FT-036 | [#301](https://github.com/CodesSentinels/ai-reviewer-test/issues/301) | 仅格式化改动被判 NEEDS_REVIEW 并给出🔴严重评论（预期忽略轻微样式）                                                                                     |
+| 中                   | FT-147 | [#315](https://github.com/CodesSentinels/ai-reviewer-test/issues/315) | triage 角色被识别为 read（读取了 GitHub 旧字段 `permission`，triage 被折叠成 read），triage 用户无法执行 `configuration`；拒绝文案也固定写“需要 write” |
+| 低                   | FT-102 | [#307](https://github.com/CodesSentinels/ai-reviewer-test/issues/307) | `@codesentinel-review-bot help` 无回复无 reaction，日志 ignored（no bot mention）                                                                      |
+| 低（已知限制）       | FT-128 | [#308](https://github.com/CodesSentinels/ai-reviewer-test/issues/308) | 命令限流为进程内内存，Actions 每次一个进程，12 条连发全部执行                                                                                          |
 
 ## 性能和成本
 
@@ -68,7 +69,7 @@
 ## 未覆盖风险
 
 1. **shell / lint 工具链完全未测**（FT-184~203，18 项 BLOCKED）：若线上开启 `enable_shell` 或 `enable_lint_tools`，沙箱、超时、脱敏、诱导读取环境变量/凭据目录等风险没有证据。
-2. **权限矩阵部分已测**：read 角色（含 PR 作者豁免与 pause/resume/resolve 被拒）已验证；write / triage 正向用例待测（FT-146/147）；无权限用户（FT-149/151）在私有仓库无法评论，无法测。另观察到 configuration 被拒时的文案写“需要 write”，与 help 表（triage）不一致。
+2. **权限矩阵部分已测**：read 角色（含 PR 作者豁免与 pause/resume/resolve 被拒）已验证；write 正向用例待测（FT-146），triage 正向用例失败（FT-147，缺陷 #315）；无权限用户（FT-149/151）在私有仓库无法评论，无法测。另观察到 configuration 被拒时的文案写“需要 write”，与 help 表（triage）不一致。
 3. **fork PR 已测（FT-240~242 PASS），但仅限同一组织内的 fork**：fork 账号 B 为组织成员，且测试时临时开启“运行 fork PR workflow”（不发送 Secret）；外部陌生贡献者、需要审批的场景未单独验证。
 4. **GitLab 全部未测**（28 项 N/A）：后续单独一轮。
 5. **容错路径无证据**（FT-182、220~225、296、297）：OpenAI 429/5xx/超时/空响应、web_search 失败降级、并发限制，锁定 SHA 无对应单测且无法在真实环境注入。
@@ -84,4 +85,4 @@
 - 建议同批修复：#311（缺少 key 仍报成功会掩盖配置错误）、#309、#301。
 - 可后续迭代：#307、#308（影响面小，#308 为已知架构限制，可在文档中说明）。
 - 若发布方接受风险，可以带条件发布：线上保持 `enable_shell:false`、`enable_lint_tools:false`，并仅用于可信的同仓库 PR，不依赖 `max_review_comments` 截断与超过 300 文件的大 PR；shell/lint、权限矩阵、fork、GitLab 需在补齐环境后另行回归。
-- 核心路径（PR 触发审查、增量审查、去重幂等、暂停/恢复、对话追问、Secret 不泄露）在基线下通过，158/226 项 PASS。
+- 核心路径（PR 触发审查、增量审查、去重幂等、暂停/恢复、对话追问、Secret 不泄露）在基线下通过，158/226 项 PASS（FAIL 9）。
