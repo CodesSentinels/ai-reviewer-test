@@ -20,22 +20,22 @@
 - bot 登录名：`codesentinel-review-bot[bot]`。
 - 账号角色：PR 作者 linfei0211（仓库 ADMIN）及用于 fork 测试的账号 B；无 write / triage / read / 无权限账号；
 - GitLab：本轮不测（用户确认后续单独测试）；
-- 隔离环境：未提供（无无密钥的隔离仓库/Environment，也无专用 key）。
+- 隔离环境：已提供 ai-reviewer-test-iso（独立私有仓库，专用低额度 OpenAI key，只读 token）；lint 阶段待测。
 
 ## 基线与线上配置差异
 
 - 测试基线采用安全加固配置：`enable_shell: false`、`enable_lint_tools: false`，ai-reviewer checkout 固定到锁定 SHA；另删除 `path_filters` 中的 `**/*.md`（md 不审查，避免测试文档占满 `max_files`）；
 - 与线上/实际部署配置的差异：基线关闭了 shell 与 lint；若线上开启，则 FT-184~203 对线上配置的结论完全没有覆盖（见“未覆盖风险”）；
-- 依赖隔离环境的变体（shell-on-isolated / lint-on-isolated）：未运行（无隔离环境、无专用 key），相关 FT 全部 BLOCKED；
+- 依赖隔离环境的变体（shell-on-isolated / lint-on-isolated）：shell-on-isolated 已在 ai-reviewer-test-iso 运行（专用 key）；lint-on-isolated 待运行；
 - 与 ai-reviewer 仓库较早测试计划（`docs/tasks/tester-1-core-review-testcases.md`、`tester-3-quality-control-testcases.md`，以 shell/lint 开启为前提）的差异：本轮以验收文档与生产 workflow 为准，沿用旧计划的用例已映射到隔离变体，不直接套用旧预期。
 
 ## 结果汇总
 
 | 状态    | 数量 | 说明                                                                                                                                                                                  |
 | ------- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| PASS    | 159  | 均有真实 run / 评论 / 日志或单测证据，见进度文档总表                                                                                                                                  |
-| FAIL    | 9    | FT-005/036/055/078/092/102/104/128/147，对应 9 个缺陷 Issue                                                                                                                           |
-| BLOCKED | 20   | 无额外账号 2 项（FT-149、151）+ 无隔离环境 18 项（FT-184~188、191~203）；不算通过                                                                                                     |
+| PASS    | 163  | 均有真实 run / 评论 / 日志或单测证据，见进度文档总表                                                                                                                                  |
+| FAIL    | 10   | FT-005/036/055/078/092/102/104/128/147/186，对应 10 个缺陷 Issue                                                                                                                      |
+| BLOCKED | 15   | 无额外账号 2 项（FT-149、151）+ 无 lint 阶段隔离测试 13 项（FT-191~203）；不算通过                                                                                                    |
 | N/A     | 37   | GitLab 28 项（后续单独测试）；OpenAI 重试/超时/空响应 FT-220~223、非 JSON 协议 FT-224/225、web_search 失败降级 FT-182、并发限制 FT-296/297（锁定 SHA 无对应单测且无法在真实环境注入） |
 | 其余    | 1    | SUBMITTED 1（FT-295，API 调用统计不完整）。FT-213 经用户确认判 PASS，FT-300 即本报告判 PASS                                                                                           |
 
@@ -52,6 +52,7 @@
 | 中                   | FT-104 | [#309](https://github.com/CodesSentinels/ai-reviewer-test/issues/309) | HEAD 已审查过时 `review` 退回到从 base 全量重审                                                                                                        |
 | 中                   | FT-036 | [#301](https://github.com/CodesSentinels/ai-reviewer-test/issues/301) | 仅格式化改动被判 NEEDS_REVIEW 并给出🔴严重评论（预期忽略轻微样式）                                                                                     |
 | 中                   | FT-147 | [#315](https://github.com/CodesSentinels/ai-reviewer-test/issues/315) | triage 角色被识别为 read（读取了 GitHub 旧字段 `permission`，triage 被折叠成 read），triage 用户无法执行 `configuration`；拒绝文案也固定写“需要 write” |
+| 中                   | FT-186 | [#316](https://github.com/CodesSentinels/ai-reviewer-test/issues/316) | shell 命令输出无任何脱敏，仅删除 4 个环境变量键；token 形态字符串原样回传模型                                                                          |
 | 低                   | FT-102 | [#307](https://github.com/CodesSentinels/ai-reviewer-test/issues/307) | `@codesentinel-review-bot help` 无回复无 reaction，日志 ignored（no bot mention）                                                                      |
 | 低（已知限制）       | FT-128 | [#308](https://github.com/CodesSentinels/ai-reviewer-test/issues/308) | 命令限流为进程内内存，Actions 每次一个进程，12 条连发全部执行                                                                                          |
 
@@ -64,11 +65,11 @@
 ## Secret 检查
 
 - 日志中无 Authorization header、token/API key 形态字符串、敏感 URL 参数（FT-231/232/233 PASS）；OPENAI_API_KEY、GITHUB_TOKEN 仅以变量名出现，值为 `***`（FT-250/251 PASS）；GITLAB_PAT 因不测 GitLab 为 N/A（FT-252）。
-- 隔离环境：未提供，未运行任何开启 shell/lint 的变体，因此不存在隔离环境使用生产密钥的情况。
+- 隔离环境：已提供（ai-reviewer-test-iso，仅含专用低额度 OpenAI key 与只读 token，无 App 私钥/BOT_PAT）；shell 变体在该仓库运行，未使用生产密钥。
 
 ## 未覆盖风险
 
-1. **shell / lint 工具链完全未测**（FT-184~203，18 项 BLOCKED）：若线上开启 `enable_shell` 或 `enable_lint_tools`，沙箱、超时、脱敏、诱导读取环境变量/凭据目录等风险没有证据。
+1. **shell 已在隔离环境测过（FT-184/185/187/188 PASS，FT-186 FAIL）；lint 工具链仍未测**（FT-191~203，13 项 BLOCKED）：若线上开启 `enable_lint_tools`，工具安装、超时、降级等没有证据。隔离环境为独立仓库 ai-reviewer-test-iso，仅含专用低额度 OpenAI key 与只读 token。
 2. **权限矩阵基本已测**：read 角色（含 PR 作者豁免与 pause/resume/resolve 被拒）已验证；write 正向用例通过（FT-146 PASS），triage 正向用例失败（FT-147，缺陷 #315）；无权限用户（FT-149/151）在私有仓库无法评论，无法测。另观察到 configuration 被拒时的文案写“需要 write”，与 help 表（triage）不一致。
 3. **fork PR 已测（FT-240~242 PASS），但仅限同一组织内的 fork**：fork 账号 B 为组织成员，且测试时临时开启“运行 fork PR workflow”（不发送 Secret）；外部陌生贡献者、需要审批的场景未单独验证。
 4. **GitLab 全部未测**（28 项 N/A）：后续单独一轮。
@@ -85,4 +86,4 @@
 - 建议同批修复：#311（缺少 key 仍报成功会掩盖配置错误）、#309、#301。
 - 可后续迭代：#307、#308（影响面小，#308 为已知架构限制，可在文档中说明）。
 - 若发布方接受风险，可以带条件发布：线上保持 `enable_shell:false`、`enable_lint_tools:false`，并仅用于可信的同仓库 PR，不依赖 `max_review_comments` 截断与超过 300 文件的大 PR；shell/lint、权限矩阵、fork、GitLab 需在补齐环境后另行回归。
-- 核心路径（PR 触发审查、增量审查、去重幂等、暂停/恢复、对话追问、Secret 不泄露）在基线下通过，159/226 项 PASS（FAIL 9）。
+- 核心路径（PR 触发审查、增量审查、去重幂等、暂停/恢复、对话追问、Secret 不泄露）在基线下通过，163/226 项 PASS（FAIL 10）。

@@ -60,7 +60,6 @@ npx jest __tests__/github-only.test.ts __tests__/characterization __tests__/comm
 - `sanitize-model-output.test.ts` — sanitizeModelOutput — 裸文本引用标记 剥离用户实际遇到的乱码（citeturn0search0） — **passed**
 - `sanitize-model-output.test.ts` — sanitizeModelOutput — 分隔符包裹形式（PUA / Block Elements） 剥离孤立分隔符字符（包裹不完整时的兜底） — **passed**
 
-
 ## 补充（2026-10-09 第二批）：陈旧 HEAD、长评论链、仓库树缓存隔离
 
 同样在锁定 SHA `8c84f45fab547821ecefbf56aabbf215eb9d7dbf` 的临时克隆上运行：`__tests__/review-head-freshness.test.ts`（26 个用例）、`repo-tree-cache-isolation.test.ts`、`conversation.test.ts`、`comment-chain-status.test.ts`、`conversation-dual-platform.test.ts`（合计 79 个用例，全部通过）。
@@ -87,6 +86,15 @@ npx jest __tests__/github-only.test.ts __tests__/characterization __tests__/comm
 - `repo-tree-cache-isolation.test.ts` — API 失败 后续请求失败不破坏已有缓存，也不返回别人的数据 — **passed**
 - 说明：缓存 key 由 platform + owner + repo + ref 组成，ref 为各 PR 的 head，所以不同 PR 互不共用。
 
+### FT-185 / FT-186 shell 超时、输出限制与脱敏（锁定 SHA clone 中运行，`bot.runLocalShellCall`）
+
+- 测试文件：`functional-tests/ai-reviewer-fixtures/unit-evidence/shell-safety.test.ts`（复制到 ai-reviewer 的 `__tests__/` 下执行 `npx jest __tests__/zz-shell-evidence.test.ts`）
+- 超时：`timeout_ms=500` 的 `sleep 10` 在约 0.5s 内被终止，outcome 为 `{type: 'timeout'}` — **passed**
+- 输出上限：默认 4096 字符，超出部分截断并带 `(truncated)` 标记 — **passed**；`max_output_length=100` 被遵守 — **passed**
+- 环境变量：`OPENAI_API_KEY`、`GITHUB_TOKEN` 不进入子进程；其他变量（如 `FAKE_OTHER_SECRET`）仍可见 — **passed**
+- 输出脱敏：`sk-proj-…`、`ghp_…` 形态字符串原样返回，**没有脱敏**（FT-186 判 FAIL，缺陷 [#316](https://github.com/CodesSentinels/ai-reviewer-test/issues/316)）
+- 说明：全量 jest 中另有 3 个与 GitLab CI / bundle 产物相关的套件失败（`gitlab-ci-security-scenarios`、`gitlab-ci-config`、`ci-trigger-bundle-provenance`），属于本地环境缺少构建产物，与本 FT 无关。
+
 ## 不适用或无证据的用例（N/A）
 
 - **FT-220/221/222/223**：OpenAI 429 / 5xx / 超时 / 空响应：锁定 SHA 没有对应单测；`src/bot.ts` 的 `createResponse` 用 `pRetry(…, {retries: openaiRetries})` 重试，失败后 `catch` 只告警并返回 `undefined`（静态阅读），但 `jest.config.json` 把 `p-retry` 替换成了 mock（`__mocks__/p-retry.js`），在单测里无法验证真实重试；本轮也无法对真实 OpenAI 做故障注入 → 记 N/A，列入报告“未覆盖风险”。
@@ -97,4 +105,4 @@ npx jest __tests__/github-only.test.ts __tests__/characterization __tests__/comm
 ## 仍未判定
 
 - FT-203 工具超时：同时依赖隔离环境（lint-on-isolated），保持 BLOCKED。
-- FT-184~188、191~202：需要隔离环境，保持 BLOCKED。
+- FT-191~202：需要隔离环境的 lint 阶段（FT-184~188 已在隔离仓库完成）。
