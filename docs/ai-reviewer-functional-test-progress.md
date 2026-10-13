@@ -18,15 +18,29 @@
 - baseline_profile: secure(shell=false, lint=false)
 - isolated_env: provided（ai-reviewer-test-iso，仅专用 OpenAI key 与只读 token）
 - current_stage: PHASE3_SUBMITTED
-- last_updated: 2026-10-13T08:00:00Z
-- last_updated_by_step: 本地修复 7 个缺陷（未提交），发现 dist 落后（#319）
+- r2_ai_reviewer_sha: c96cd53e0c1a23abf85ecb21c5a0e90a255333c5
+- r2_sha_note: ai-reviewer 修复分支 fix/regression-defects-r1 的“重新打包 dist”提交；dist/SOURCE_SHA=1ca3e94309ae54966a961052fa517848298a7cb5（源码修复提交）；获取时间 2026-10-13
+- last_updated: 2026-10-13T09:00:00Z
+- last_updated_by_step: R2 SHA 已确认，r2-pin.sh 与复测计划已写入
 
 ## 下一步（Next Actions）
 
-1. 用户：收尾——把账号 B 恢复为 read（或移除）；还原 fork 设置（取消勾选 “Run workflows from fork pull requests”）；PR #314 保持打开不合并；作废隔离环境专用 OpenAI key 与只读 token，归档 `ai-reviewer-test-iso`。
-2. 用户：审阅并提交 ai-reviewer 本地分支 `fix/regression-defects-r1`（用户要求“先修复这些 issue”）里的修复：#315、#316、#317、#318、#307、#309、#302（见变更日志）。提交源码后，Claude 执行 `npm run package` 生成 dist，再由用户单独提交 “chore: 重新打包 dist”。
-3. 用户：决定未修复项——#301（格式化改动被判需审查/严重，属提示词与分类调优）、#303/#305（同一问题换行范围后重复发布，需要内容相似度去重的设计决定）、#308（限流只在进程内，GitHub 上无法靠内存实现）、#311（缺少 API key 时跳过而不是失败，源码注释写明是刻意设计，需产品决定）、#319（dist 落后源码）。
-4. 修复合入并重新打包 dist 后：取“重新打包 dist”那个提交的完整 SHA，新开 R2（SHA 的 `dist/SOURCE_SHA` 必须是包含修复的源码提交），复测 FT-078/104/102/147/186/197/202（FT-102/307 对应 #307）等；本轮 R1 的端到端证据代表 dist@1a6f6606（见 #319），源码/单测证据代表锁定 SHA 的源码。
+1. 用户：执行 `bash functional-tests/ai-reviewer-fixtures/r2-pin.sh`，把 main 与三个测试分支（-20261008 / -b / -c）的锁定 SHA 换成 R2 的 `c96cd53e`（main 走 PR 并自动合并）。完成后告诉 Claude，再进入 R2 复测步骤（见下方“R2 复测计划”）。
+2. 用户：收尾——账号 B 恢复为 read（或移除，FT-147 复测时需要临时设为 triage）；还原 fork 设置；PR #314 保持打开；隔离环境（ai-reviewer-test-iso）若要复测 #316/#317/#318 需保留专用 key 与只读 token，否则作废并归档。
+3. 用户：未修复项的决定——#301、#303/#305、#308、#311、#319（见下）。
+
+## R2 复测计划（SHA c96cd53e，dist 已包含修复）
+
+范围（只复测已修复的缺陷，再加一次基线冒烟；其余 FT 沿用 R1 结论，见 #319 的有效性说明）：
+
+- FT-102（#307）：在 #304 评论 `@codesentinel-review-bot help`，预期有回复（需 main 已换 SHA）。
+- FT-104（#309）：在 #304 的 -b 分支先提交一个可审查文件让 HEAD 被审查，再 `@ai-reviewer pause`，再 `@ai-reviewer review`，预期回复“已审查，没有新提交”且无新增评论。
+- FT-147（#315）：账号 B 设为 triage，在 PR #314 评论 `@ai-reviewer configuration`，预期允许。
+- FT-078（#302）：在 PR #300 的测试分支一次推送 62 个新文件，预期增量审查处理全部 62 个（R1 只处理 30 个）。
+- FT-186/197/202（#316/#317/#318）：需要隔离环境（ai-reviewer-test-iso）重新固定到 R2 SHA 后复测：shell 输出脱敏、Prettier 在 CI 下能报出发现、ESLint 安装失败后 Prettier 仍可用。
+- 基线冒烟：R2 的第一次自动审查（上面 FT-104 的提交）确认审查流程正常，新增行为（大型 PR 处理）未破坏基线。
+
+不在 R2 范围：#301、#303/#305、#308、#311（未修复）；GitLab 相关（本轮不测）。
 
 ## 阶段与运行记录
 
@@ -418,6 +432,7 @@
 
 ## 变更日志（倒序，只追加）
 
+- 2026-10-13T09:00:00Z：用户提交并推送 ai-reviewer 修复分支，R2 的 SHA 为 `c96cd53e0c1a23abf85ecb21c5a0e90a255333c5`（dist/SOURCE_SHA=1ca3e94，已核对包含 role_name / NO_COLOR / 独立安装目录等修复）。新增 r2-pin.sh（main 与三个测试分支换 SHA）与 R2 复测计划；本次 smoke 有 2 项 GitLab 相关失败属上游脚本与 minimizeWrites 行为不一致，与修复无关。
 - 2026-10-13T08:00:00Z：用户给出新 SHA `0a63eb9a`（develop 最新，比 R1 SHA 多 17 个提交）。核对发现：(1) 新 SHA 未修复我们的缺陷；(2) develop/main 的 `dist/` 都构建自 `1a6f6606`（2026-09-07），落后源码 45 个提交，R1 的端到端 run 实际运行的就是这份 dist——新增缺陷 [#319](https://github.com/CodesSentinels/ai-reviewer-test/issues/319)，R1 端到端结论代表 dist，源码/单测结论代表锁定 SHA 源码；(3) 复核 #305 证据评论，发现 SQL 注入与明文令牌其实已合并发布，原“严重问题被静默丢弃”结论不成立，已在 #305 评论更正（FT-092 仍因重复发布判 FAIL，缺陷与 #303 同类）。用户要求先修复缺陷：在本地 ai-reviewer 仓库分支 `fix/regression-defects-r1` 修复 #315（role_name 映射 triage/maintain，拒绝文案不再写死 write）、#316（shell 输出脱敏 + 密钥类环境变量不下发）、#317（Prettier 关闭颜色并剥离 ANSI，解析不到时告警）、#318（npm 工具独立安装目录）、#307（bot 登录名去掉 [bot] 后缀）、#309（暂停后 HEAD 已审查时 review 不再从 base 重审）、#302（compare 列表达到 300 上限时增量文件不再求交集），均带回归测试，全量 jest 2802 通过；未提交、未推送。
 - 2026-10-13T04:00:00Z：FT-149/151 以单测证据（权限矩阵 55 条、平台术语 11 条）与 PR #314 的真实拒绝回复判 PASS（GitHub 上无法构造 none 用户：私有仓库无权限者无法评论，公开仓库 API 对任何人返回 read；已临时公开隔离仓库核对并改回私有）。BLOCKED 清零。PASS 177 / FAIL 11。
 - 2026-10-13T03:00:00Z：隔离 lint 批次（ai-reviewer-test-iso PR #2，7 个阶段）读取完成：FT-191~196/198~202 判 PASS；FT-197 判 FAIL（缺陷 #317：CI 下 Prettier 输出带 ANSI 颜色，适配器 0 发现）；新增观察项 #318（npm 工具安装失败后 Prettier 可执行文件消失）。PASS 175 / FAIL 11 / BLOCKED 2。
