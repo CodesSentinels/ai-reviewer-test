@@ -30,7 +30,7 @@
 ## 下一步（Next Actions）
 
 1. 用户：收尾（安全相关，请尽快）——作废隔离环境的专用 OpenAI key 与只读 token（`github_pat_…`，曾在对话中暴露），归档 `ai-reviewer-test-iso`（PR #1~#4 不合并）；还原 fork 设置；PR #300/#304/#310 保持打开不合并；账号 B 当前权限为 none，无需处理。
-2. 用户：推动 #319（dist 落后）的发布流程修复——本次合入后 develop 的 dist 再次落后一个提交（上游 `b3cf8e2`），靠手工重新打包补上；建议把“dist/SOURCE_SHA 必须等于发布提交”做成 CI 检查。
+2. 已在上游建 Issue：[CodesSentinels/ai-reviewer#168](https://github.com/CodesSentinels/ai-reviewer/issues/168)（对应测试仓库 #319，dist 落后与 CI 检查）和 [#169](https://github.com/CodesSentinels/ai-reviewer/issues/169)（对应 #323，被截断 finding 未持久化）；用户：推动 #168 的发布流程修复——本次合入后 develop 的 dist 再次落后一个提交（上游 `b3cf8e2`），靠手工重新打包补上；建议把“dist/SOURCE_SHA 必须等于发布提交”做成 CI 检查。
 3. 用户（可选）：观察项 #323（被截断的 finding 未持久化，补发依赖模型重新生成）是否需要上游处理。
 4. 本轮验收已闭环：R1~R4 完成，PASS 188 / FAIL 0 / N/A 37 / SUBMITTED 1（FT-295）；FT-147 在 R4 未重测（沿用 R2 结论，用户确认不测）。后续如要放行新版本，以最新“重新打包 dist”提交 SHA 再抽样回归。
 
@@ -446,6 +446,7 @@
 
 ## 变更日志（倒序，只追加）
 
+- 2026-10-14T12:00:00Z：应用户要求在上游仓库建立 Issue：CodesSentinels/ai-reviewer#168（dist 落后于源码，建议 CI 检查）、#169（被截断的 finding 未持久化）；并在测试仓库 #319、#323 下留了链接评论。
 - 2026-10-14T11:00:00Z：R4 抽样回归（SHA 24c87694，develop 合入后、dist 与源码一致）读取完成：FT-005/036/055/078/102/104/128/186/197/202 均再次通过；FT-092 第一次因模型合并评论未触发截断，重做后截断与去重生效，但只补发了 1 条被截断的 finding，另 1 条依赖模型重新生成未出现——记为观察项 [#323](https://github.com/CodesSentinels/ai-reviewer-test/issues/323)，FT-092 仍为 PASS（R3 完整补发）。内容层去重在真实 run 中生效 9 次；上游“与 patch 不重叠的评论丢弃”（b3cf8e2）未触发（0 次），无副作用。FT-147 用户确认不测，沿用 R2 结论。汇总不变：PASS 188 / FAIL 0 / N/A 37 / SUBMITTED 1。
 - 2026-10-14T09:00:00Z：fix/regression-defects-r1 已合入 develop（PR #167，合并提交 9f20f5b1）。核对：修复提交均为祖先；合并状态全量 jest 2837 通过；develop 上的 dist 仍是 66468ab2 构建、落后合并后的源码（上游另一提交 b3cf8e2 未打包），在本地重新打包后由用户提交为 24c87694（dist/SOURCE_SHA=9f20f5b1，与源码一致）。R4 的 SHA 为 24c87694013c9e5655a920404e582123cbde09fd；新增 r4-pin.sh、r4-batch.sh、iso-r4.sh。
 - 2026-10-14T08:00:00Z：R3（SHA b73adc3e）读取完成：FT-005（#311）、FT-036（#301）、FT-055（#303）、FT-092（#305）、FT-128（#308）全部复测 PASS。汇总 PASS 188 / FAIL 0 / N/A 37 / SUBMITTED 1（FT-295）。说明：FT-055/092 的真实 run 实际生效的是位置层去重，新增内容层去重（同问题不同行范围）靠单测；FT-036 为提示词优化，模型行为可能波动；FT-005 的失败是预期结果。基线冒烟：12 条 help 中前 10 条正常，新限流多一次读评论调用不影响命令；其余 run 均成功。
