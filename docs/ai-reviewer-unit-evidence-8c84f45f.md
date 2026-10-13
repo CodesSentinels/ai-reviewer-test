@@ -114,11 +114,19 @@ npx jest __tests__/github-only.test.ts __tests__/characterization __tests__/comm
 - `platform-terms.test.ts`（11 条通过）：GitHub 保持 `write`/`read` 等内部权限名，GitLab 换成项目角色名 — **passed**
 - 真实回复（PR #314，B=read 执行 pause）：“需要仓库 `write` 及以上权限……当前权限: `read`”。
 
+### FT-220 / 221 / 222 / 223 / 182 OpenAI 调用容错与 web_search 失败降级（ai-reviewer develop 24c87694）
+
+- 脚本：`functional-tests/ai-reviewer-fixtures/unit-evidence/openai-resilience.cjs`，15/15 通过。用 Node 直接加载 ai-reviewer 的 CommonJS 编译副本，使用**真实 p-retry**（jest 配置把 p-retry 映射成“只调用一次”的 mock，所以 jest 里测不到重试），假的 OpenAI 客户端按脚本返回错误或响应。
+- FT-220：连续 2 次 429 后成功（调用 3 次）— **passed**；持续 429 重试耗尽后返回空文本、不抛异常 — **passed**。
+- FT-221：500、503 后成功 — **passed**；持续 502 返回空文本 — **passed**；记录行为：401 也被重试 — **passed（记录）**。
+- FT-222：超时 1 次后成功（调用 2 次）— **passed**；持续超时返回空文本 — **passed**；客户端 timeout 取自配置、SDK 自带重试关闭 — **passed**。
+- FT-223：output 空数组 / null / 无 output_text / 空消息 — **passed**（空文本、不抛异常、空消息不调 API）。
+- FT-182：web_search 失败但有正文 → 返回正文并记录失败步骤 — **passed**；开关关闭时不记录 web_search_call — **passed**；带 web_search 的请求被 400 拒绝 → 空文本不抛异常 — **passed**。
+- 失败的呈现：模型无响应时 `bot.chat` 返回空文本，`review.ts` 把空响应记入 `summariesFailed` / `reviewsFailed`，据此生成“审查不完整”提示（REVIEW-006），不会静默当成无问题。
+
 ## 不适用或无证据的用例（N/A）
 
-- **FT-220/221/222/223**：OpenAI 429 / 5xx / 超时 / 空响应：锁定 SHA 没有对应单测；`src/bot.ts` 的 `createResponse` 用 `pRetry(…, {retries: openaiRetries})` 重试，失败后 `catch` 只告警并返回 `undefined`（静态阅读），但 `jest.config.json` 把 `p-retry` 替换成了 mock（`__mocks__/p-retry.js`），在单测里无法验证真实重试；本轮也无法对真实 OpenAI 做故障注入 → 记 N/A，列入报告“未覆盖风险”。
 - **FT-224/225**：非法 JSON / Markdown 包裹 JSON：ai-reviewer 的审查输出不是 JSON 协议，而是“行号范围 + Markdown 评论”的文本格式（`src/review.ts` 里的 `JSON.parse` 只用来读取外部 lint 报告）→ 不适用，记 N/A。
-- **FT-182**：搜索失败后安全降级：没有对应单测，也无法在真实环境阻断 web_search → 记 N/A。
 - **FT-296/297**：OpenAI / GitHub API 并发限制：用 `p-limit` 实现（`src/review.ts`），`p-limit` 在 jest 中同样被 mock，且没有对应用例 → 记 N/A。
 
 ## 仍未判定
