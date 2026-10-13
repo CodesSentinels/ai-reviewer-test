@@ -19,18 +19,33 @@
 - isolated_env: provided（ai-reviewer-test-iso，仅专用 OpenAI key 与只读 token）
 - current_stage: PHASE3_SUBMITTED
 - r2_ai_reviewer_sha: c96cd53e0c1a23abf85ecb21c5a0e90a255333c5
+- r4_ai_reviewer_sha: 24c87694013c9e5655a920404e582123cbde09fd
+- r4_sha_note: ai-reviewer develop 最新（PR #167 合入后的“重新打包 dist”提交）；dist/SOURCE_SHA=9f20f5b1d6c4788be7107fd791f06fea7c27db6c（合并提交，与源码一致，已核对 src 无差异）；获取时间 2026-10-14
 - r3_ai_reviewer_sha: b73adc3e2630bf70241298e515b59bfc5d727917
 - r3_sha_note: 修复分支 fix/regression-defects-r1 第二批修复的“重新打包 dist”提交；dist/SOURCE_SHA=66468ab2c85bd28d457b57c3d63b4cdd729b3dc9；获取时间 2026-10-14
 - r2_sha_note: ai-reviewer 修复分支 fix/regression-defects-r1 的“重新打包 dist”提交；dist/SOURCE_SHA=1ca3e94309ae54966a961052fa517848298a7cb5（源码修复提交）；获取时间 2026-10-13
-- last_updated: 2026-10-14T08:00:00Z
-- last_updated_by_step: R3 全部复测完成，FAIL 清零
+- last_updated: 2026-10-14T09:00:00Z
+- last_updated_by_step: R4 SHA 已确认，脚本与计划已写入
 
 ## 下一步（Next Actions）
 
-1. 用户：收尾（安全相关，请尽快）——作废隔离环境的专用 OpenAI key 与只读 token（`github_pat_…`，曾在对话中暴露），归档 `ai-reviewer-test-iso`（PR #1、#2、#3 不合并）；账号 B 恢复为 read 或移除；还原 fork 设置；PR #300/#304/#310 保持打开不合并。
-2. 用户：把 ai-reviewer 修复分支 `fix/regression-defects-r1`（最新“重新打包 dist”提交 `b73adc3e`）提 PR 合入 develop，并推动 #319（dist 落后）的发布流程修复；建议让上游维护者重点评审 #311（缺 key 改为失败）、#308（限流依赖评论列表）、#303/#305（内容层去重）。
-3. Claude：本轮验收闭环——补全最终报告“发布建议”（R1/R2/R3 汇总：226 项里 PASS 188、N/A 37、SUBMITTED 1，缺陷全部复测通过但修复尚未合入），刷新总回归 Issue #299。
-4. 修复合入 develop 并重新打包后，如需正式放行：以合入后的“重新打包 dist”提交 SHA 做一次全量回归抽样（R4）。
+1. 用户：执行 R4 抽样回归（合入 develop 后的版本，SHA 24c87694）：
+   - `bash functional-tests/ai-reviewer-fixtures/r4-pin.sh`（main 与三个测试分支换 SHA）；
+   - `bash functional-tests/ai-reviewer-fixtures/r4-batch.sh`（主仓库批次，约 40~50 分钟，覆盖 FT-128/055/092/036/102/104/078）；
+   - `bash functional-tests/ai-reviewer-fixtures/iso-r4.sh`（隔离仓库批次，覆盖 FT-197/202/186/005；隔离仓库的专用 key 与只读 token 仍有效，先别作废）；
+   - 可选：FT-147（#315）——重新邀请账号 B 为 triage（B 当前权限为 none），B 在 PR #304 评论 `@ai-reviewer configuration`。
+2. Claude：读取 R4 结果，补全最终报告，刷新总回归 Issue #299。
+3. 用户：R4 结束后立即收尾（安全相关）——作废隔离环境的专用 OpenAI key 与只读 token（`github_pat_…`，曾在对话中暴露），归档 `ai-reviewer-test-iso`；账号 B 恢复 read 或移除；还原 fork 设置；PR #300/#304/#310 保持打开不合并。
+4. 用户：推动 #319（dist 落后）的发布流程修复——本次合入后 develop 的 dist 再次落后一个提交（上游 `b3cf8e2`），靠手工重新打包补上，建议把“dist/SOURCE_SHA 必须等于发布提交”做成 CI 检查。
+
+## R4 抽样回归计划（SHA 24c87694）
+
+目的：用真正合入 develop 的版本，对 11 个已修复缺陷各抽 1 个核心用例，并看上游新增的“与当前文件任何 patch 都不重叠的评论直接丢弃”（`b3cf8e2`）有无副作用。
+
+- 主仓库（PR #304 / #300）：FT-128 限流、FT-055 与 FT-092（同一问题不重复、截断后补发）、FT-036（仅格式化判 APPROVED）、FT-102（真实 bot login）、FT-104（暂停后 review 提示已审查）、FT-078（一次推送 62 个文件）。
+- 隔离仓库：FT-197（Prettier）、FT-202（安装失败不影响其他工具）、FT-186（shell 功能不回归）、FT-005（缺 key 时 job 失败）。
+- 需要另外操作：FT-147（B 重新邀请为 triage）。
+- 副作用观察：对比 R3，评论总量是否异常变少，日志里 `Dropped comment for line range` 出现的次数。
 
 ## R2 复测计划（SHA c96cd53e，dist 已包含修复）
 
@@ -435,6 +450,7 @@
 
 ## 变更日志（倒序，只追加）
 
+- 2026-10-14T09:00:00Z：fix/regression-defects-r1 已合入 develop（PR #167，合并提交 9f20f5b1）。核对：修复提交均为祖先；合并状态全量 jest 2837 通过；develop 上的 dist 仍是 66468ab2 构建、落后合并后的源码（上游另一提交 b3cf8e2 未打包），在本地重新打包后由用户提交为 24c87694（dist/SOURCE_SHA=9f20f5b1，与源码一致）。R4 的 SHA 为 24c87694013c9e5655a920404e582123cbde09fd；新增 r4-pin.sh、r4-batch.sh、iso-r4.sh。
 - 2026-10-14T08:00:00Z：R3（SHA b73adc3e）读取完成：FT-005（#311）、FT-036（#301）、FT-055（#303）、FT-092（#305）、FT-128（#308）全部复测 PASS。汇总 PASS 188 / FAIL 0 / N/A 37 / SUBMITTED 1（FT-295）。说明：FT-055/092 的真实 run 实际生效的是位置层去重，新增内容层去重（同问题不同行范围）靠单测；FT-036 为提示词优化，模型行为可能波动；FT-005 的失败是预期结果。基线冒烟：12 条 help 中前 10 条正常，新限流多一次读评论调用不影响命令；其余 run 均成功。
 - 2026-10-13T11:30:00Z：R2 隔离环境批次（SHA c96cd53e）读取完成：FT-197（#317）、FT-202（#318，npm 工具独立目录后 Prettier 不再被连带破坏）、FT-186（#316，单测 + 真实 run）复测 PASS。R2 复测范围内 7 个缺陷（#302/#307/#309/#315/#316/#317/#318）全部复测通过。汇总 PASS 183 / FAIL 5（FT-005/036/055/092/128，对应未修复的 #311/#301/#303/#305/#308）/ N/A 37 / SUBMITTED 1（FT-295）。方法教训：连续两次 push 间隔过短时，pull_request run 的 checkout 可能滞后于 API 看到的 diff，复测每次 push 后必须等 run 结束再推下一次（r2 脚本阶段 1 与阶段 2 紧邻是这次阶段 2 取证无效的原因）。
 - 2026-10-13T10:30:00Z：R2：B（triage）在 #304 评论 configuration 被允许，FT-147（#315）复测 PASS。PASS 181 / FAIL 7。剩余复测：隔离环境 FT-186/197/202。
