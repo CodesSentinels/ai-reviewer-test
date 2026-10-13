@@ -43,32 +43,45 @@ fresh_worktree() {   # $1 = 本地分支名  $2 = 起点（origin/xxx）
   cd "${WT}"
 }
 
+# 测试分支可能已在别的 worktree / 当前工作区被检出（git 不允许同一分支同时检出两处），
+# 所以用分离 HEAD 的临时 worktree，提交后 push 到同名远端分支。
+detached_worktree() {   # $1 = 起点（origin/xxx）
+  rm -rf "${WT}"
+  git -C "${ORIG}" worktree prune
+  git -C "${ORIG}" worktree add -q --detach "${WT}" "$1"
+  cd "${WT}"
+}
+
 : > "${LOG}"
 git -C "${ORIG}" fetch -q origin
 say "旧 SHA: ${OLD_SHA}"
 say "新 SHA: ${NEW_SHA}"
 
-# 1) main（走 PR 并合并）
-fresh_worktree "test/r2-pin-main" "origin/main"
-edit_pin
-git diff --stat
-git add -A
-git commit -q -m "test: R2 锁定 SHA 换成修复后的 ${NEW_SHA:0:8}"
-git push -q -u origin "test/r2-pin-main"
-url="$(gh pr create --repo "${REPO}" --base main --head "test/r2-pin-main" --title "test: R2 锁定 SHA 换成修复后的 ${NEW_SHA:0:8}" --body "R2：评论类事件使用 main 的 workflow，需要先把锁定 SHA 换成修复后的提交。关联总回归 Issue #299。")"
-n="$(printf '%s' "${url}" | grep -oE '[0-9]+$')"
-say "已创建 PR #${n}: ${url}"
-if gh pr merge "${n}" --repo "${REPO}" --squash --delete-branch; then
-  say "已合并 PR #${n}"
+# 1) main（走 PR 并合并；已经是新 SHA 则跳过）
+if git -C "${ORIG}" show "origin/main:.github/workflows/ai-reviewer.yml" | grep -q "${NEW_SHA}"; then
+  say "main 已是新 SHA，跳过"
 else
-  say "自动合并失败，请在 GitHub 上手动合并 PR #${n} 后重新执行本脚本（已处理过的分支会被跳过）。"
-  exit 1
+  fresh_worktree "test/r2-pin-main" "origin/main"
+  edit_pin
+  git diff --stat
+  git add -A
+  git commit -q -m "test: R2 锁定 SHA 换成修复后的 ${NEW_SHA:0:8}"
+  git push -q -u origin "test/r2-pin-main"
+  url="$(gh pr create --repo "${REPO}" --base main --head "test/r2-pin-main" --title "test: R2 锁定 SHA 换成修复后的 ${NEW_SHA:0:8}" --body "R2：评论类事件使用 main 的 workflow，需要先把锁定 SHA 换成修复后的提交。关联总回归 Issue #299。")"
+  n="$(printf '%s' "${url}" | grep -oE '[0-9]+$')"
+  say "已创建 PR #${n}: ${url}"
+  if gh pr merge "${n}" --repo "${REPO}" --squash --delete-branch; then
+    say "已合并 PR #${n}"
+  else
+    say "自动合并失败，请在 GitHub 上手动合并 PR #${n} 后重新执行本脚本（已处理过的分支会被跳过）。"
+    exit 1
+  fi
 fi
 
 # 2) 三个测试分支（直接提交推送）
 for b in ${BRANCHES}; do
   say "== ${b}"
-  fresh_worktree "${b}" "origin/${b}"
+  detached_worktree "origin/${b}"
   if grep -q "${NEW_SHA}" .github/workflows/ai-reviewer.yml; then
     say "已是新 SHA，跳过"
     continue
@@ -76,7 +89,7 @@ for b in ${BRANCHES}; do
   edit_pin
   git add -A
   git commit -q -m "test: R2 锁定 SHA 换成修复后的 ${NEW_SHA:0:8}"
-  git push -q origin "${b}"
+  git push -q origin "HEAD:${b}"
   say "已推送 ${b}"
 done
 
