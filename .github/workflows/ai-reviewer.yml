@@ -49,11 +49,11 @@ jobs:
         with:
           node-version: "20"
       - uses: actions/checkout@v4
-      # 本轮锁定 SHA，来源 develop，获取时间 2026-10-08T06:44:44Z，见 docs/ai-reviewer-functional-test-progress.md
+      # R2 锁定 SHA（修复分支 fix/regression-defects-r1，dist 对应 1ca3e94309ae54966a961052fa517848298a7cb5），见 docs/ai-reviewer-functional-test-progress.md
       - uses: actions/checkout@v4
         with:
           repository: CodesSentinels/ai-reviewer
-          ref: 8c84f45fab547821ecefbf56aabbf215eb9d7dbf
+          ref: c96cd53e0c1a23abf85ecb21c5a0e90a255333c5
           path: .github/ai-reviewer-action
           token: ${{ steps.bot-token.outputs.token }}
       - uses: ./.github/ai-reviewer-action
