@@ -24,7 +24,7 @@
 ## 下一步（Next Actions）
 
 1. 用户：收尾——把账号 B 恢复为 read（或移除）；还原 fork 设置（取消勾选 “Run workflows from fork pull requests”）；PR #314 保持打开不合并。
-2. 用户/Claude：继续隔离环境的 lint 阶段（FT-191~203）：先提交 iso-setup.sh 与 unit-evidence，再由 Claude 扩展脚本增加 lint 子命令；测完撤销专用 OpenAI key 与只读 token，归档隔离仓库。
+2. 用户：运行隔离 lint 批次 `bash functional-tests/ai-reviewer-fixtures/iso-lint-batch.sh`（7 个阶段，约 20~30 分钟；中断后 `START=N bash …` 继续），完成后告诉 Claude；Claude 读取 FT-191~202。
 3. 用户：缺陷 #301 等 10 项（含 #315、#316）暂不通知团队。
 
 ## 阶段与运行记录
@@ -58,7 +58,7 @@
 
 ## FT 状态总表
 
-汇总：共 226 项；PASS 163 / FAIL 10 / BLOCKED 15 / N/A 37 / 其余 1（SUBMITTED 1）。
+汇总：共 226 项；PASS 164 / FAIL 10 / BLOCKED 14 / N/A 37 / 其余 1（SUBMITTED 1）。
 
 ### A. 环境与启动
 
@@ -271,7 +271,7 @@
 | FT-200 | semgrep_config 生效          | external-observation | e2e           | no                 | yes      | BLOCKED | -                                                                                                                                                                                           | -          | 2026-10-09 | 用户确认没有隔离环境（无无密钥的隔离仓库/Environment 与专用 key）；baselineMeaningful=no，基线下不得判 PASS                                                                                                                                            |
 | FT-201 | 工具版本覆盖生效             | external-observation | e2e           | no                 | yes      | BLOCKED | -                                                                                                                                                                                           | -          | 2026-10-09 | 用户确认没有隔离环境（无无密钥的隔离仓库/Environment 与专用 key）；baselineMeaningful=no，基线下不得判 PASS                                                                                                                                            |
 | FT-202 | 工具安装失败安全降级         | external-observation | e2e           | no                 | yes      | BLOCKED | -                                                                                                                                                                                           | -          | 2026-10-09 | 用户确认没有隔离环境（无无密钥的隔离仓库/Environment 与专用 key）；baselineMeaningful=no，基线下不得判 PASS                                                                                                                                            |
-| FT-203 | 工具超时安全处理             | external-observation | unit-evidence | no                 | yes      | BLOCKED | -                                                                                                                                                                                           | -          | 2026-10-09 | 用户确认没有隔离环境（无无密钥的隔离仓库/Environment 与专用 key）；baselineMeaningful=no，基线下不得判 PASS                                                                                                                                            |
+| FT-203 | 工具超时安全处理             | external-observation | unit-evidence | no                 | yes      | PASS    | [单测证据](https://github.com/CodesSentinels/ai-reviewer-test/blob/test/ai-reviewer-develop-functional-20261008/docs/ai-reviewer-unit-evidence-8c84f45f.md)                                 | -          | 2026-10-12 | 无法靠 PR 稳定复现，使用单测证据（锁定 SHA clone）：runCommand 默认超时 60s；timeoutMs=300 的 `sleep 10` 约 0.3s 被终止，返回 timedOut=true 且不抛异常；命令不存在返回 spawnError；Biome 扫描超时返回空 findings 不抛异常                              |
 | FT-204 | 外部 lint_report_path 可读取 | fixture              | e2e           | yes                | no       | PASS    | [run 37908407667](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37908407667)                                                                                              | -          | 2026-10-09 | lint_report_path=mixed.json：日志 `loaded external lint report — 1 finding(s), 5 dropped, produced by a secret-free job`，合法条目被读取                                                                                                               |
 | FT-205 | 畸形报告顶层被拒绝           | fixture              | e2e           | yes                | no       | PASS    | [run 37908670782](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37908670782)                                                                                              | -          | 2026-10-09 | 顶层为数组的报告：`lint report is not a JSON object` + `external lint report rejected by schema — continuing without it`，整份报告被拒绝且审查继续                                                                                                     |
 | FT-206 | 绝对路径 finding 被丢弃      | fixture              | e2e           | yes                | no       | PASS    | [run 37908407667](https://github.com/CodesSentinels/ai-reviewer-test/actions/runs/37908407667)                                                                                              | -          | 2026-10-09 | 混合报告含 1 条绝对路径条目：与另外 4 条非法条目一起被丢弃（`5 dropped`，合法 1 条保留）                                                                                                                                                               |
@@ -414,6 +414,7 @@
 
 ## 变更日志（倒序，只追加）
 
+- 2026-10-12T12:00:00Z：FT-203（工具超时）以单测证据判 PASS；新增 iso-lint-batch.sh（隔离 PR 上 7 个 lint 阶段，覆盖 FT-191~202）。PASS 164 / BLOCKED 14。
 - 2026-10-12T11:30:00Z：隔离环境（ai-reviewer-test-iso，PR #1，run 38237774235）shell 阶段：FT-184/185/187/188 判 PASS，FT-186 判 FAIL（缺陷 [#316](https://github.com/CodesSentinels/ai-reviewer-test/issues/316)）；新增单测证据 unit-evidence/shell-safety.test.ts。PASS 163 / FAIL 10 / BLOCKED 15。
 - 2026-10-12T10:00:00Z：权限矩阵阶段 W（B=write）：pause/resume 均被允许，FT-146 判 PASS。剩余 BLOCKED：FT-149/151（私有仓库无权限者无法评论）与 FT-184~188、191~203（无隔离环境）。PASS 159 / FAIL 9 / BLOCKED 20。
 - 2026-10-12T09:40:00Z：权限矩阵阶段 T（B=triage）：configuration 三次均被拒（bot 判定为 read），FT-147 判 FAIL，缺陷 [#315](https://github.com/CodesSentinels/ai-reviewer-test/issues/315)（github-platform.ts:1013 读旧字段 permission，triage 被折叠为 read）。PASS 158 / FAIL 9 / BLOCKED 21。

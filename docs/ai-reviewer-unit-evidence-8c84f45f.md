@@ -95,6 +95,14 @@ npx jest __tests__/github-only.test.ts __tests__/characterization __tests__/comm
 - 输出脱敏：`sk-proj-…`、`ghp_…` 形态字符串原样返回，**没有脱敏**（FT-186 判 FAIL，缺陷 [#316](https://github.com/CodesSentinels/ai-reviewer-test/issues/316)）
 - 说明：全量 jest 中另有 3 个与 GitLab CI / bundle 产物相关的套件失败（`gitlab-ci-security-scenarios`、`gitlab-ci-config`、`ci-trigger-bundle-provenance`），属于本地环境缺少构建产物，与本 FT 无关。
 
+### FT-203 lint 工具超时安全处理（锁定 SHA clone 中运行）
+
+- 测试文件：`functional-tests/ai-reviewer-fixtures/unit-evidence/lint-timeout-real.test.ts`、`lint-timeout-adapter.test.ts`（复制到 ai-reviewer 的 `__tests__/` 下运行）
+- `DEFAULT_TOOL_TIMEOUT_MS` 为 60 秒 — **passed**
+- `runCommand({command:'sleep', args:['10'], timeoutMs:300})` 约 0.3 秒被终止，返回 `timedOut=true`，不抛异常 — **passed**
+- 命令不存在时返回 `spawnError=true`，不抛异常 — **passed**
+- Biome 扫描超时（mock `runCommand` 返回 timedOut）→ findings 为空，不抛异常 — **passed**
+
 ## 不适用或无证据的用例（N/A）
 
 - **FT-220/221/222/223**：OpenAI 429 / 5xx / 超时 / 空响应：锁定 SHA 没有对应单测；`src/bot.ts` 的 `createResponse` 用 `pRetry(…, {retries: openaiRetries})` 重试，失败后 `catch` 只告警并返回 `undefined`（静态阅读），但 `jest.config.json` 把 `p-retry` 替换成了 mock（`__mocks__/p-retry.js`），在单测里无法验证真实重试；本轮也无法对真实 OpenAI 做故障注入 → 记 N/A，列入报告“未覆盖风险”。
@@ -104,5 +112,4 @@ npx jest __tests__/github-only.test.ts __tests__/characterization __tests__/comm
 
 ## 仍未判定
 
-- FT-203 工具超时：同时依赖隔离环境（lint-on-isolated），保持 BLOCKED。
-- FT-191~202：需要隔离环境的 lint 阶段（FT-184~188 已在隔离仓库完成）。
+- FT-191~202：隔离环境的 lint 阶段（FT-184~188 已在隔离仓库完成）。
