@@ -83,4 +83,5 @@ jobs:
             !.output/**
           enable_lint_tools: false
           enable_semgrep: true
+          max_review_comments: "1"
           debug_resolve_inject_failures: "3"
