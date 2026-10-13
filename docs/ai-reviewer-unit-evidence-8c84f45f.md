@@ -103,6 +103,17 @@ npx jest __tests__/github-only.test.ts __tests__/characterization __tests__/comm
 - 命令不存在时返回 `spawnError=true`，不抛异常 — **passed**
 - Biome 扫描超时（mock `runCommand` 返回 timedOut）→ findings 为空，不抛异常 — **passed**
 
+### FT-149 / FT-151 权限 none 与 GitHub 权限术语（锁定 SHA clone 中运行）
+
+- 无法在真实 GitHub 上构造 `none` 用户：私有仓库中无权限者看不到仓库也不能评论；公开仓库的 `collaborators/{user}/permission` 对任何人都返回 `read`（用账号 B 在临时公开的隔离仓库核对，随后改回私有）。
+- `command-permission-matrix.test.ts` + `command-permission.test.ts`（共 55 条通过）：
+  - 各命令低于最低权限（help=read、configuration=triage、其余=write）一律拒绝 — **passed**
+  - 外部贡献者（权限 none）在自己 PR 上只能触发豁免集内命令（help/review/full review/summary） — **passed**
+  - API 抛错 / 用户不存在 → 权限为 none，查询失败时所有命令都被拒绝（fail closed） — **passed**
+  - none 在 help 要求 read 时不能执行 help — **passed**
+- `platform-terms.test.ts`（11 条通过）：GitHub 保持 `write`/`read` 等内部权限名，GitLab 换成项目角色名 — **passed**
+- 真实回复（PR #314，B=read 执行 pause）：“需要仓库 `write` 及以上权限……当前权限: `read`”。
+
 ## 不适用或无证据的用例（N/A）
 
 - **FT-220/221/222/223**：OpenAI 429 / 5xx / 超时 / 空响应：锁定 SHA 没有对应单测；`src/bot.ts` 的 `createResponse` 用 `pRetry(…, {retries: openaiRetries})` 重试，失败后 `catch` 只告警并返回 `undefined`（静态阅读），但 `jest.config.json` 把 `p-retry` 替换成了 mock（`__mocks__/p-retry.js`），在单测里无法验证真实重试；本轮也无法对真实 OpenAI 做故障注入 → 记 N/A，列入报告“未覆盖风险”。
