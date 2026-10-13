@@ -4,6 +4,7 @@
 
 ## Meta
 
+- scope: GitHub only（GitLab 28 项单独测试，不计入本轮统计分母）
 - round: R1
 - ai_reviewer_sha: 8c84f45fab547821ecefbf56aabbf215eb9d7dbf
 - sha_fetched_at: 2026-10-08T06:44:44Z
@@ -32,7 +33,7 @@
 1. 用户：收尾（安全相关，请尽快）——作废隔离环境的专用 OpenAI key 与只读 token（`github_pat_…`，曾在对话中暴露），归档 `ai-reviewer-test-iso`（PR #1~#4 不合并）；还原 fork 设置；PR #300/#304/#310 保持打开不合并；账号 B 当前权限为 none，无需处理。
 2. 已在上游建 Issue：[CodesSentinels/ai-reviewer#168](https://github.com/CodesSentinels/ai-reviewer/issues/168)（对应测试仓库 #319，dist 落后与 CI 检查）和 [#169](https://github.com/CodesSentinels/ai-reviewer/issues/169)（对应 #323，被截断 finding 未持久化）；用户：推动 #168 的发布流程修复——本次合入后 develop 的 dist 再次落后一个提交（上游 `b3cf8e2`），靠手工重新打包补上；建议把“dist/SOURCE_SHA 必须等于发布提交”做成 CI 检查。
 3. 用户（可选）：观察项 #323（被截断的 finding 未持久化，补发依赖模型重新生成）是否需要上游处理。
-4. 本轮验收已闭环：R1~R4 完成，PASS 188 / FAIL 0 / N/A 37 / SUBMITTED 1（FT-295）；FT-147 在 R4 未重测（沿用 R2 结论，用户确认不测）。后续如要放行新版本，以最新“重新打包 dist”提交 SHA 再抽样回归。
+4. 本轮验收已闭环：R1~R4 完成，GitHub 范围 198 项：PASS 188 / FAIL 0 / N/A 9 / SUBMITTED 1（FT-295）；GitLab 28 项单独测试；FT-147 在 R4 未重测（沿用 R2 结论，用户确认不测）。后续如要放行新版本，以最新“重新打包 dist”提交 SHA 再抽样回归。
 
 ## R4 抽样回归计划（SHA 24c87694）
 
@@ -54,7 +55,7 @@
 - FT-186/197/202（#316/#317/#318）：需要隔离环境（ai-reviewer-test-iso）重新固定到 R2 SHA 后复测：shell 输出脱敏、Prettier 在 CI 下能报出发现、ESLint 安装失败后 Prettier 仍可用。
 - 基线冒烟：R2 的第一次自动审查（上面 FT-104 的提交）确认审查流程正常，新增行为（大型 PR 处理）未破坏基线。
 
-不在 R2 范围：#301、#303/#305、#308、#311（未修复）；GitLab 相关（本轮不测）。
+不在 R2 范围：#301、#303/#305、#308、#311（未修复）。
 
 ## 阶段与运行记录
 
@@ -87,7 +88,7 @@
 
 ## FT 状态总表
 
-汇总：共 226 项；PASS 188 / FAIL 0 / BLOCKED 0 / N/A 37 / 其余 1（SUBMITTED 1）。（R1 的 FAIL 经 R2/R3 复测全部通过；失败证据保留在缺陷清单与备注中）
+汇总：共 226 项；GitLab 28 项不在本轮范围（单独测试，状态 N/A 仅表示本轮不测，不计入分母）；本轮范围 198 项：PASS 188 / FAIL 0 / BLOCKED 0 / N/A 9 / SUBMITTED 1（FT-295）。（R1 的 FAIL 经 R2/R3/R4 复测全部通过；失败证据保留在缺陷清单与备注中）
 
 ### A. 环境与启动
 
@@ -352,6 +353,8 @@
 
 ### O. GitLab 专项
 
+> 范围外：本节用例由 GitLab 专项单独测试；这里的 N/A 只表示本轮不测，不计入本轮统计。
+
 | FT     | 标题                             | type            | coverage | baselineMeaningful | 隔离环境 | 状态 | 证据链接 | 缺陷 Issue | 最后更新   | 备注                                                                                                 |
 | ------ | -------------------------------- | --------------- | -------- | ------------------ | -------- | ---- | -------- | ---------- | ---------- | ---------------------------------------------------------------------------------------------------- |
 | FT-260 | MR open 触发审查                 | external-gitlab | e2e      | yes                | no       | N/A  | -        | -          | 2026-10-09 | 本轮不测 GitLab（用户确认：后续单独测试 GitLab 仓库）；本轮按“不适用”处理，GitLab 结果以后续轮次为准 |
@@ -418,7 +421,7 @@
 ## 阻塞与待用户事项
 
 - 隔离环境（shell-on-isolated / lint-on-isolated）：待用户回答。未提供时，以下 FT 保持 BLOCKED：FT-184, FT-185, FT-186, FT-187, FT-188, FT-191, FT-192, FT-193, FT-194, FT-195, FT-196, FT-197, FT-198, FT-199, FT-200, FT-201, FT-202, FT-203。
-- 多账号 / fork / GitLab：FT-102、FT-140~150（需要 write / triage / read / 无权限账号）、FT-240~242（fork 账号）、FT-152、FT-227、FT-252、FT-253、FT-260~283（GitLab Runner 与 PAT）缺少前置时标 BLOCKED。
+- 多账号 / fork：FT-140~150（需要 write / triage / read / 无权限账号）、FT-240~242（fork 账号）缺少前置时标 BLOCKED。
 - 故障注入 / 单测证据：coverage 为 needs-injection 或 unit-evidence 的 FT（见总表）无法靠常规 PR 复现，取不到证据时标 N/A 并写明理由。
 
 ## 待确认差异
@@ -446,6 +449,7 @@
 
 ## 变更日志（倒序，只追加）
 
+- 2026-10-14T14:00:00Z：用户确认 GitLab 单独重新测试、不在本次范围：报告与进度文档中去掉 GitLab 相关的未覆盖风险、统计分母与计划描述（FT 定义与 case-map 保持 226 项不变，GitLab 28 项状态保留 N/A 并注明范围外）。本轮范围 198 项：PASS 188 / N/A 9 / SUBMITTED 1。
 - 2026-10-14T13:00:00Z：关闭 12 个已修复并复测通过的缺陷 Issue（#301、#302、#303、#305、#307、#308、#309、#311、#315、#316、#317、#318），每个留了关闭评论（修复 PR、复测 SHA、证据位置；#315 注明 R4 未单独重测、#301 注明提示词行为可能波动、#305 注明补发不保证完整）。保持打开：#319（dist 落后，上游 ai-reviewer#168）、#323（观察项，上游 ai-reviewer#169）。
 - 2026-10-14T12:00:00Z：应用户要求在上游仓库建立 Issue：CodesSentinels/ai-reviewer#168（dist 落后于源码，建议 CI 检查）、#169（被截断的 finding 未持久化）；并在测试仓库 #319、#323 下留了链接评论。
 - 2026-10-14T11:00:00Z：R4 抽样回归（SHA 24c87694，develop 合入后、dist 与源码一致）读取完成：FT-005/036/055/078/102/104/128/186/197/202 均再次通过；FT-092 第一次因模型合并评论未触发截断，重做后截断与去重生效，但只补发了 1 条被截断的 finding，另 1 条依赖模型重新生成未出现——记为观察项 [#323](https://github.com/CodesSentinels/ai-reviewer-test/issues/323)，FT-092 仍为 PASS（R3 完整补发）。内容层去重在真实 run 中生效 9 次；上游“与 patch 不重叠的评论丢弃”（b3cf8e2）未触发（0 次），无副作用。FT-147 用户确认不测，沿用 R2 结论。汇总不变：PASS 188 / FAIL 0 / N/A 37 / SUBMITTED 1。

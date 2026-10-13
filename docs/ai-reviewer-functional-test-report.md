@@ -19,7 +19,7 @@
 - 现有 workflow `.github/workflows/ai-reviewer.yml`：触发 pull_request（opened/synchronize/reopened）、pull_request_review_comment、issue_comment，以及 push（main、`test/dev*`）；通过 GitHub App token checkout ai-reviewer 并 `uses: ./.github/ai-reviewer-action`；secrets：APP_ID、APP_PRIVATE_KEY、OPENAI_API_KEY（另有 BOT_PAT，当前未启用）。
 - bot 登录名：`codesentinel-review-bot[bot]`。
 - 账号角色：PR 作者 linfei0211（仓库 ADMIN）及用于 fork 测试的账号 B；无 write / triage / read / 无权限账号；
-- GitLab：本轮不测（用户确认后续单独测试）；
+- 范围：本报告只覆盖 GitHub。GitLab 相关用例（28 项）单独测试，不在本报告范围内，也不计入下面统计的分母；
 - 隔离环境：已提供 ai-reviewer-test-iso（独立私有仓库，专用低额度 OpenAI key，只读 token）；shell 与 lint 阶段均已测。
 
 ## 基线与线上配置差异
@@ -31,13 +31,15 @@
 
 ## 结果汇总
 
-| 状态    | 数量 | 说明                                                                                                                                                                                  |
-| ------- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| PASS    | 188  | 均有真实 run / 评论 / 日志或单测证据，见进度文档总表                                                                                                                                  |
-| FAIL    | 0    | R1 共 11 项 FAIL，经 R2（6 项）与 R3（5 项）复测已全部通过；缺陷 Issue 保留，修复尚未合入 develop                                                                                     |
-| BLOCKED | 0    | 无                                                                                                                                                                                    |
-| N/A     | 37   | GitLab 28 项（后续单独测试）；OpenAI 重试/超时/空响应 FT-220~223、非 JSON 协议 FT-224/225、web_search 失败降级 FT-182、并发限制 FT-296/297（锁定 SHA 无对应单测且无法在真实环境注入） |
-| 其余    | 1    | SUBMITTED 1（FT-295，API 调用统计不完整）。FT-213 经用户确认判 PASS，FT-300 即本报告判 PASS                                                                                           |
+| 状态    | 数量 | 说明                                                                                                                                                    |
+| ------- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PASS    | 188  | 均有真实 run / 评论 / 日志或单测证据，见进度文档总表                                                                                                    |
+| FAIL    | 0    | R1 共 11 项 FAIL，经 R2（6 项）与 R3（5 项）复测已全部通过；修复已合入 develop（ai-reviewer PR #167），12 个缺陷 Issue 已关闭                           |
+| BLOCKED | 0    | 无                                                                                                                                                      |
+| N/A     | 9    | OpenAI 重试/超时/空响应 FT-220~223、非 JSON 协议 FT-224/225、web_search 失败降级 FT-182、并发限制 FT-296/297（锁定 SHA 无对应单测且无法在真实环境注入） |
+| 其余    | 1    | SUBMITTED 1（FT-295，API 调用统计不完整）。FT-213 经用户确认判 PASS，FT-300 即本报告判 PASS                                                             |
+
+统计口径：本报告只覆盖 GitHub。226 项中 GitLab 28 项不在本轮范围，本轮范围 198 项：PASS 188、N/A 9、未完成 1（FT-295）。
 
 ## R2 复测（修复后的 SHA）
 
@@ -89,7 +91,7 @@
 
 ## Secret 检查
 
-- 日志中无 Authorization header、token/API key 形态字符串、敏感 URL 参数（FT-231/232/233 PASS）；OPENAI_API_KEY、GITHUB_TOKEN 仅以变量名出现，值为 `***`（FT-250/251 PASS）；GITLAB_PAT 因不测 GitLab 为 N/A（FT-252）。
+- 日志中无 Authorization header、token/API key 形态字符串、敏感 URL 参数（FT-231/232/233 PASS）；OPENAI_API_KEY、GITHUB_TOKEN 仅以变量名出现，值为 `***`（FT-250/251 PASS）。
 - 隔离环境：已提供（ai-reviewer-test-iso，仅含专用低额度 OpenAI key 与只读 token，无 App 私钥/BOT_PAT）；shell 变体在该仓库运行，未使用生产密钥。
 
 ## 未覆盖风险
@@ -98,26 +100,21 @@
 1. **shell 与 lint 已在隔离环境测过**（隔离仓库 ai-reviewer-test-iso，专用低额度 OpenAI key 与只读 token）：shell FT-184/185/187/188 PASS、FT-186 FAIL；lint FT-191~196/198~203 PASS、FT-197 FAIL。仅覆盖锁定 SHA 与上述配置，未覆盖更多项目类型（如 Vue、monorepo）。
 2. **权限矩阵已测，但 none 用户只有单测证据**：read（含 PR 作者豁免与 pause/resume/resolve 被拒）、write 已在真实 PR 验证；triage 正向用例失败（FT-147，缺陷 #315）；none 用户无法在 GitHub 上构造（私有仓库无权限者无法评论，公开仓库 API 对所有人返回 read），FT-149/151 以单测与 read 角色的真实拒绝回复判 PASS。另观察到 configuration 被拒时的文案写“需要 write”，与 help 表（triage）不一致。
 3. **fork PR 已测（FT-240~242 PASS），但仅限同一组织内的 fork**：fork 账号 B 为组织成员，且测试时临时开启“运行 fork PR workflow”（不发送 Secret）；外部陌生贡献者、需要审批的场景未单独验证。
-4. **GitLab 全部未测**（28 项 N/A）：后续单独一轮。
-5. **容错路径无证据**（FT-182、220~225、296、297）：OpenAI 429/5xx/超时/空响应、web_search 失败降级、并发限制，锁定 SHA 无对应单测且无法在真实环境注入。
-6. **FT-213 已判 PASS（用户确认），但仅限基线**：基线下持密钥 job 在 pull_request 事件检出 PR 的 merge commit（`actions/checkout` 默认行为）；action 代码来自单独固定 SHA 的 checkout，shell/lint 关闭时 PR 代码不会被执行。若线上开启 shell/lint，该结论不成立。
-7. **FT-295** API 调用统计不完整。
-8. 其他注意：`debug_resolve_inject_failures` 在该 SHA 不生效，FT-061 以单测证据替代；限流缺陷 #308 为架构限制。
+4. **容错路径无证据**（FT-182、220~225、296、297）：OpenAI 429/5xx/超时/空响应、web_search 失败降级、并发限制，锁定 SHA 无对应单测且无法在真实环境注入。
+5. **FT-213 已判 PASS（用户确认），但仅限基线**：基线下持密钥 job 在 pull_request 事件检出 PR 的 merge commit（`actions/checkout` 默认行为）；action 代码来自单独固定 SHA 的 checkout，shell/lint 关闭时 PR 代码不会被执行。若线上开启 shell/lint，该结论不成立。
+6. **FT-295** API 调用统计不完整。
+7. 其他注意：`debug_resolve_inject_failures` 在该 SHA 不生效，FT-061 以单测证据替代；限流缺陷 #308 为架构限制。
 
 ## 发布建议
 
-**R1 锁定的 SHA（`8c84f45f`）不建议发布；修复分支（R3 SHA `b73adc3e`）已通过全部复测，建议合入 develop、重新打包 dist 后发布。**
+**R1 锁定的 SHA（`8c84f45f`）不建议发布；修复已合入 develop（PR #167），在合入后的版本 `24c87694`（dist 与源码一致）上完成了抽样回归，GitHub 范围内可以发布。**
 
-发布前必须完成：
+发布前请确认：
 
-1. **#319（流程）**：develop / main 的 `dist/` 落后源码 45 个提交，Action 实际运行的是 2026-09-07 的旧构建。合入修复后必须重新打包 dist，并让 `dist/SOURCE_SHA` 对应发布提交；建议在 CI 里加这项检查。
-2. **合入修复分支** `fix/regression-defects-r1`（含 11 项缺陷的修复）并重新打包 dist：#302、#307、#309、#315、#316、#317、#318（R2 通过）和 #301、#303、#305、#308、#311（R3 通过）。
-3. **请上游维护者重点评审**这几处对既有设计的改动：#311（缺少 `OPENAI_API_KEY` 由“跳过并成功退出”改为 job 失败）、#308（限流改为依赖平台评论列表计数，每条命令多一次读评论的调用）、#303/#305（新增内容层去重，按评论里的代码标识符判断同一问题）、#301（提示词调整，模型行为可能波动）。
+1. **dist 与发布提交一致（#319 / 上游 ai-reviewer#168）**：发布的提交上 `dist/SOURCE_SHA` 必须对应源码；上游尚未加 CI 检查，合入后 dist 曾两次落后，需要手工重新打包。
+2. **行为变化已写入发布说明**：#311（缺少 `OPENAI_API_KEY` 由“跳过并成功退出”改为 job 失败，fork PR 拿不到 Secret 也会失败）、#308（命令限流：同一用户 60 秒内最多 10 条，每条命令多一次读评论的调用）、#315（triage 角色可执行 `configuration`）、#316（shell 输出脱敏、密钥类环境变量不下发）、提示词调整（#301，模型行为可能波动）、内容层去重（#303/#305）。
+3. **已知限制**：被 `max_review_comments` 截断的问题补发依赖模型重新生成，不保证完整（#323 / 上游 ai-reviewer#169）。
 
-带条件发布的边界（若线上与本轮基线不同）：
+没覆盖的 GitHub 相关项（需要后续单独安排）：OpenAI 429/5xx/超时/空响应的故障注入、web_search 失败降级、并发限制（共 9 项），以及 FT-295（平台 API 调用统计，日志里没有这类数据）。
 
-- 线上开启 shell：#316 的脱敏修复必须已合入；
-- 线上开启 Prettier：#317 的修复必须已合入；
-- 仍有 N/A 的 37 项（GitLab 28 项、OpenAI 容错与并发限制 9 项）和 FT-295（API 调用统计不完整）没有证据，需要后续单独一轮。
-
-R4 已在合入 develop 且 dist 完整的版本（24c87694）上完成抽样回归，结论与 R2/R3 一致。核心路径（PR 触发审查、增量审查、去重幂等、暂停/恢复、对话追问、权限、限流、Secret 不泄露、shell 与 lint 工具链）在隔离环境与基线下通过，188/226 项 PASS。
+核心路径（PR 触发审查、增量审查、去重幂等、暂停/恢复、对话追问、权限、限流、Secret 不泄露、shell 与 lint 工具链）在隔离环境与基线下通过，GitHub 范围 198 项中 188 项 PASS、0 项 FAIL。
