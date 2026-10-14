@@ -1,0 +1,6 @@
+{
+  "results": [
+    {"tool": "eslint", "toolVersion": "9.0.0", "file": "../../etc/passwd", "line": 1, "column": 1, "severity": "error", "ruleId": "x/dotdot", "message": "dot-dot path finding must be dropped"},
+    {"tool": "eslint", "toolVersion": "9.0.0", "file": "functional-tests/ai-reviewer-fixtures/workspace/lint/lint-issues.ts", "line": 2, "column": 9, "severity": "error", "ruleId": "no-unused-vars", "message": "valid entry stays"}
+  ]
+}
