@@ -63,24 +63,16 @@ jobs:
         with:
           bot_github_login: "codesentinel-review-bot[bot]"
           # resolve_token: ${{ secrets.BOT_PAT }}
-          debug: true
+          debug: false
           review_simple_changes: false
-          review_comment_lgtm: false
+          review_comment_lgtm: true
           openai_heavy_model: gpt-5.4-mini
           enable_shell: false
-          enable_web_search: true
+          enable_web_search: false
           enable_dependency_analysis: true
-          path_filters: |
-            **/*.ts
-            **/*.vue
-            **/*.js
-            **/*.yml
-            **/*.yaml
-            package.json
-            !**/*.lock
-            !node_modules/**
-            !dist/**
-            !.output/**
           enable_lint_tools: false
           enable_semgrep: true
+          max_dependency_files: "1"
+          bot_icon: "🧪"
+          bot_name: "Regression Bot"
           debug_resolve_inject_failures: "3"

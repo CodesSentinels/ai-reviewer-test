@@ -1,0 +1,5 @@
+{
+  "results": [
+    {"tool": "eslint", "toolVersion": "9.0.0", "file": "functional-tests/ai-reviewer-fixtures/workspace/orders/pricing.ts", "line": 11, "column": 3, "severity": "error", "ruleId": "custom/loop-bound", "message": "Loop bound 'items.length - 1' skips the last element."}
+  ]
+}
