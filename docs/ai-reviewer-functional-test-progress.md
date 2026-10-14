@@ -455,6 +455,7 @@
 
 ## 变更日志（倒序，只追加）
 
+- 2026-10-15T03:00:00Z：应用户要求给出上游 `ai-reviewer#168`（dist 落后源码的 CI 检查）的完整操作步骤：新增 `docs/upstream-168/`（检查脚本 check-dist-fresh.js、11 条单测、dist-fresh.yml、可选的 repack-dist.yml、README 步骤）。脚本已在 ai-reviewer 的真实历史上验证：0a63eb9（落后 45 个提交）与 9f20f5b（src/prompts.ts、src/review.ts 未打包）判失败，24c8769 与当前 develop 4684cad 判通过。由用户在上游仓库操作；落地并按步骤演练通过后，关闭测试仓库 #319。
 - 2026-10-15T02:00:00Z：用户决定不补跑 R5 的批次 B/C/D，按“验证范围说明”的口径发布；验收到此闭环。状态：GitHub 范围 198 项 PASS 193 / FAIL 0 / N/A 4 / SUBMITTED 1；发布候选 4684cad3；#319、#323 等待上游；批次 B/C/D 对应用例沿用 R1 结论。
 - 2026-10-15T01:00:00Z：用户确认 fix/similar-comments-r5 已合入 develop（PR #174，develop 最新 4684cad3）。核对：dist/SOURCE_SHA=a6028a02，自该提交以来 src 无差异；git 树与 R6 测过的 acc61bb5 完全一致，R6 结论直接适用。已关闭缺陷 #325（评论注明合并后只锚定第一个位置）；更新发布说明草稿与最终报告的发布建议。保持打开：#319、#323。
 - 2026-10-14T23:00:00Z：R6（SHA acc61bb5，PR #327，重放 Phase 1~3 + full review）读取完成：FT-093/094 复测 PASS（many-issues.ts 30 个缺陷 → 3 条评论、每条列出其余 9 个位置，日志 `similar-merge: 39 findings → 12`，合并恰好减少 27 条且全部来自该文件，无误合并）；汇总回到 PASS 193 / FAIL 0。观察：R6 的 Phase 1/2 评论数比 R5 少（Phase 1 发布 5 条 vs 9 条、Phase 2 4 条 vs 5 条），Phase 1/2 日志没有 similar-merge，属于模型输出的运行间波动，不是合并造成的；因此 FT-171~174/179 等依赖具体评论的用例以 R5 的证据为准。#325 保持打开，等修复合入 develop。
