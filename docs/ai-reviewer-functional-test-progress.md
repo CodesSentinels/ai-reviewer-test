@@ -20,30 +20,26 @@
 - isolated_env: provided（ai-reviewer-test-iso，仅专用 OpenAI key 与只读 token）
 - current_stage: PHASE3_SUBMITTED
 - r2_ai_reviewer_sha: c96cd53e0c1a23abf85ecb21c5a0e90a255333c5
+- r6_ai_reviewer_sha: acc61bb5765e26285f27b5e45c68a08878dd7667
+- r6_sha_note: #325 修复分支 fix/similar-comments-r5（ai-reviewer 本地新分支，已推送，尚未合入 develop）的“重新打包 dist”提交；dist/SOURCE_SHA=a6028a021037372639d96c7c3021fb9931379eeb；获取时间 2026-10-14
 - r4_ai_reviewer_sha: 24c87694013c9e5655a920404e582123cbde09fd
 - r4_sha_note: ai-reviewer develop 最新（PR #167 合入后的“重新打包 dist”提交）；dist/SOURCE_SHA=9f20f5b1d6c4788be7107fd791f06fea7c27db6c（合并提交，与源码一致，已核对 src 无差异）；获取时间 2026-10-14
 - r3_ai_reviewer_sha: b73adc3e2630bf70241298e515b59bfc5d727917
 - r3_sha_note: 修复分支 fix/regression-defects-r1 第二批修复的“重新打包 dist”提交；dist/SOURCE_SHA=66468ab2c85bd28d457b57c3d63b4cdd729b3dc9；获取时间 2026-10-14
 - r2_sha_note: ai-reviewer 修复分支 fix/regression-defects-r1 的“重新打包 dist”提交；dist/SOURCE_SHA=1ca3e94309ae54966a961052fa517848298a7cb5（源码修复提交）；获取时间 2026-10-13
-- last_updated: 2026-10-14T21:00:00Z
-- last_updated_by_step: R5 批次 A 判定完成，发现 #325
+- last_updated: 2026-10-14T22:00:00Z
+- last_updated_by_step: R6 SHA 已确认，脚本与计划已写入
 
 ## 下一步（Next Actions）
 
-1. 用户：R5（在发布候选版本 24c87694 上补跑完整回归）——批次 A：`bash functional-tests/ai-reviewer-fixtures/r5-lane.sh`（重放 Phase 1~3，新分支 test/r5-lane + 新 PR，约 30~40 分钟）；跑完告诉 Claude，由 Claude 读取并逐项判定对应 FT。
-2. Claude：批次 A 判定后，准备批次 B（命令、暂停恢复、对话追问，新建卫星 PR）和批次 C（配置变体，沿用 variant-batch-b.sh 并改用新 PR/分支）；批次 D（Phase 以外的杂项：路径过滤、性能记录等）视情况合并。
-3. 不在 R5 范围（环境已不存在，沿用 R1~R4 结论）：隔离环境用例 FT-184/187/188/191~196/198~201（共 13 项，专用 key 与只读 token 已作废、仓库已归档）；需要账号 B 的角色与 fork 用例 FT-148/149/151/240~242；GitLab 28 项；FT-295、FT-224/225、FT-296/297。
-4. 用户：R5 全部结束后更新发布决定；发布说明草稿见 `docs/ai-reviewer-release-notes-draft.md`；#319/#323 等待上游（`ai-reviewer#168`、`#169`）。
-
-## R5 补跑计划（SHA 24c87694，目的：让“完整功能回归”也发生在发布候选版本上）
-
-分类（按 case-map 与当前状态统计，193 项 PASS 中）：
-
-- 已在新版本上重测或用单测验证：27 项（R2~R4 与 FT-182/220~223 等），不重复。
-- **主仓库可重跑：约 150 项**——Phase 1~3 基础审查与增量（约 70 项）、命令与权限（admin 账号可执行的部分，约 30 项）、配置变体（约 11 项）、安全/注入/性能记录等。
-- 需要已作废的隔离环境：13 项；需要账号 B：6 项（FT-148/149/151/240~242）——不重跑，沿用结论并在报告注明。
-
-批次：A Phase 1~3（r5-lane.sh）→ B 命令与对话（新卫星 PR）→ C 配置变体 → D 其余。每批由 Claude 读取 run 与评论后逐项判定；与 R1 结论一致则注明“R5 在 24c87694 上复核一致”，不一致则按缺陷处理。注意新版本行为变化（初始化 PR 只出摘要、按优先级截断、限流、去重）可能使部分 R1 预期需要重新解释，会逐项写明。
+1. 用户：R6（复测 #325 的修复，SHA acc61bb5）：
+   - `bash functional-tests/ai-reviewer-fixtures/r6-pin.sh`（main 与三个测试分支换 SHA）；
+   - `bash functional-tests/ai-reviewer-fixtures/r6-lane.sh`（新分支 test/r6-lane + 新 PR，重放 Phase 1~3 + full review，约 10 分钟）；
+   - 跑完告诉 Claude：对比 R5（PR #324）的评论数、many-issues.ts 是否由 10 条相同评论变成 1 条（列出其余位置）、`==` 与除零是否出现、其他评论有无被误合并。
+2. Claude：R6 判定后——通过则 FT-093/094 改回 PASS，关闭 #325，并决定是否继续 R5 的批次 B（命令与对话）、C（配置变体）、D；不通过则继续迭代修复。
+3. 用户：#325 的修复在 ai-reviewer 分支 `fix/similar-comments-r5`，合入 develop 前建议让上游评审设计取舍（合并后评论只锚定第一个位置，其余位置以文字列出）。
+4. 不在范围（沿用 R1~R4 结论）：隔离环境用例（13 项）、账号 B 用例（6 项）、GitLab 28 项、FT-295、FT-224/225、FT-296/297。
+5. 用户：发布决定——发布说明草稿见 `docs/ai-reviewer-release-notes-draft.md`；#319/#323 等待上游（`ai-reviewer#168`、`#169`）；#325 修复/接受后再发。
 
 ## R4 抽样回归计划（SHA 24c87694）
 
@@ -460,6 +456,7 @@
 
 ## 变更日志（倒序，只追加）
 
+- 2026-10-14T22:00:00Z：应用户选择先处理 #325：在 ai-reviewer 本地分支 fix/similar-comments-r5 新增 `mergeSimilarFindings`（同一文件内正文几乎相同的多处发现合并为一条、保留所有位置，在评论上限截断之前执行；字符 3-gram Jaccard≥0.9），带 8 条单测；用 R5 的 33 条真实评论验证 many-issues.ts 10→1、其余 23 条不变；全量 jest 2845 通过。用户提交并推送，R6 的 SHA 为 acc61bb5765e26285f27b5e45c68a08878dd7667（dist/SOURCE_SHA=a6028a02，已核对）。新增 r6-pin.sh、r6-lane.sh。
 - 2026-10-14T21:00:00Z：R5 批次 A（r5-lane.sh，PR #324，Phase 1~3 重放 + full review）读取完成。在 24c87694 上复核一致的 FT 共 44 项（基础审查、摘要、增量、文件增删、跨文件、注入、路径过滤相关的基线项、性能记录等，PASS 保持，备注加“R5 复核一致”）；**FT-093/094 失败**（many-issues.ts 的 10 处 eval 各发一条相同评论、其余 20 处缺陷未发布；R1 旧构建只有 3 条合并评论），缺陷 [#325](https://github.com/CodesSentinels/ai-reviewer-test/issues/325)。本批未覆盖（沿用 R1）：FT-053（需 rerun）、FT-077/072~076/091（需配置变体）、FT-177、FT-081、lint/lint-report 变体类。观察：FT-245 的评论为英文。汇总 PASS 191 / FAIL 2。
 - 2026-10-14T20:00:00Z：用户决定在 24c87694 上补跑完整回归（R5）。已分类：主仓库可重跑约 150 项、需已作废隔离环境 13 项、需账号 B 6 项；新增批次 A 脚本 r5-lane.sh（重放 R1 的三个 Phase 提交里的 workspace：28 / 29 / 82 个文件，新分支 test/r5-lane + 新 PR），已在临时 worktree 验证重放逻辑。后续批次 B（命令与对话）、C（配置变体）待批次 A 判定后准备。
 - 2026-10-14T19:00:00Z：新增发布说明草稿 `docs/ai-reviewer-release-notes-draft.md`；在最终报告加“验证范围说明”：完整功能回归（R1）运行的是旧构建（dist@1a6f6606），发布候选版本 24c87694 上重新执行的是 R2~R4 的针对性回归与抽样回归、FT-182/220~223 单测，以及上游 2837 条单测；对外可以说“针对性回归与抽样回归”，不能说“完整功能回归在该版本上全部通过”。如需完整回归，需在 24c87694 上重跑主流程批次（待发布负责人决定）。
