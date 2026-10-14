@@ -29,14 +29,14 @@
 - r3_ai_reviewer_sha: b73adc3e2630bf70241298e515b59bfc5d727917
 - r3_sha_note: 修复分支 fix/regression-defects-r1 第二批修复的“重新打包 dist”提交；dist/SOURCE_SHA=66468ab2c85bd28d457b57c3d63b4cdd729b3dc9；获取时间 2026-10-14
 - r2_sha_note: ai-reviewer 修复分支 fix/regression-defects-r1 的“重新打包 dist”提交；dist/SOURCE_SHA=1ca3e94309ae54966a961052fa517848298a7cb5（源码修复提交）；获取时间 2026-10-13
-- last_updated: 2026-10-15T01:00:00Z
-- last_updated_by_step: #325 修复已合入 develop 并关闭，发布候选 4684cad3
+- last_updated: 2026-10-15T02:00:00Z
+- last_updated_by_step: 用户决定不补跑 B/C/D，验收闭环
 
 ## 下一步（Next Actions）
 
 1. 发布候选版本：develop 最新 `4684cad355cb86dc049b6ded0221de68d7d92025`（PR #174 合入后）。已核对：`dist/SOURCE_SHA`=`a6028a02`，自该提交以来 `src/` 无差异；git 树与 R6 测过的 `acc61bb5` 完全一致，所以 R6 的结论直接适用，不需要再开一轮。
 2. 用户：发布决定——发布说明草稿 `docs/ai-reviewer-release-notes-draft.md` 已更新（包含 #325 的修复，提交改为上述 SHA）；发布前确认 dist 与发布提交一致（#319 / 上游 `ai-reviewer#168` 尚未落地）。
-3. 用户（可选）：是否继续 R5 的批次 B（命令与对话，约 30 项）、C（配置变体，约 11 项）、D；批次 A 已在 24c87694 与 acc61bb5 上两次验证主流程。不补跑则按报告“验证范围说明”的口径发布。
+3. 用户已决定**不补跑** R5 的批次 B（命令与对话）、C（配置变体）、D：按报告“验证范围说明”的口径发布——完整功能回归主要取自旧构建，发布候选版本上有 R2~R4 针对性回归与抽样回归、R5/R6 的 Phase 1~3 重放；B/C/D 对应的用例沿用 R1 结论。
 4. 不在范围（沿用 R1~R4 结论）：隔离环境用例（13 项）、账号 B 用例（6 项）、GitLab 28 项、FT-295、FT-224/225、FT-296/297。
 5. 测试仓库 main 当前固定的是 `acc61bb5`（与 develop 最新同树），无需再换 SHA；#319、#323 保持打开，等待上游。
 
@@ -455,6 +455,7 @@
 
 ## 变更日志（倒序，只追加）
 
+- 2026-10-15T02:00:00Z：用户决定不补跑 R5 的批次 B/C/D，按“验证范围说明”的口径发布；验收到此闭环。状态：GitHub 范围 198 项 PASS 193 / FAIL 0 / N/A 4 / SUBMITTED 1；发布候选 4684cad3；#319、#323 等待上游；批次 B/C/D 对应用例沿用 R1 结论。
 - 2026-10-15T01:00:00Z：用户确认 fix/similar-comments-r5 已合入 develop（PR #174，develop 最新 4684cad3）。核对：dist/SOURCE_SHA=a6028a02，自该提交以来 src 无差异；git 树与 R6 测过的 acc61bb5 完全一致，R6 结论直接适用。已关闭缺陷 #325（评论注明合并后只锚定第一个位置）；更新发布说明草稿与最终报告的发布建议。保持打开：#319、#323。
 - 2026-10-14T23:00:00Z：R6（SHA acc61bb5，PR #327，重放 Phase 1~3 + full review）读取完成：FT-093/094 复测 PASS（many-issues.ts 30 个缺陷 → 3 条评论、每条列出其余 9 个位置，日志 `similar-merge: 39 findings → 12`，合并恰好减少 27 条且全部来自该文件，无误合并）；汇总回到 PASS 193 / FAIL 0。观察：R6 的 Phase 1/2 评论数比 R5 少（Phase 1 发布 5 条 vs 9 条、Phase 2 4 条 vs 5 条），Phase 1/2 日志没有 similar-merge，属于模型输出的运行间波动，不是合并造成的；因此 FT-171~174/179 等依赖具体评论的用例以 R5 的证据为准。#325 保持打开，等修复合入 develop。
 - 2026-10-14T22:00:00Z：应用户选择先处理 #325：在 ai-reviewer 本地分支 fix/similar-comments-r5 新增 `mergeSimilarFindings`（同一文件内正文几乎相同的多处发现合并为一条、保留所有位置，在评论上限截断之前执行；字符 3-gram Jaccard≥0.9），带 8 条单测；用 R5 的 33 条真实评论验证 many-issues.ts 10→1、其余 23 条不变；全量 jest 2845 通过。用户提交并推送，R6 的 SHA 为 acc61bb5765e26285f27b5e45c68a08878dd7667（dist/SOURCE_SHA=a6028a02，已核对）。新增 r6-pin.sh、r6-lane.sh。
