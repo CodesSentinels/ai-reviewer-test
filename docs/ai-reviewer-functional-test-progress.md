@@ -29,16 +29,25 @@
 - r3_ai_reviewer_sha: b73adc3e2630bf70241298e515b59bfc5d727917
 - r3_sha_note: 修复分支 fix/regression-defects-r1 第二批修复的“重新打包 dist”提交；dist/SOURCE_SHA=66468ab2c85bd28d457b57c3d63b4cdd729b3dc9；获取时间 2026-10-14
 - r2_sha_note: ai-reviewer 修复分支 fix/regression-defects-r1 的“重新打包 dist”提交；dist/SOURCE_SHA=1ca3e94309ae54966a961052fa517848298a7cb5（源码修复提交）；获取时间 2026-10-13
-- last_updated: 2026-10-15T02:00:00Z
-- last_updated_by_step: 用户决定不补跑 B/C/D，验收闭环
+- last_updated: 2026-10-15T04:00:00Z
+- last_updated_by_step: #168 检查已合入 develop，main 合并推迟
 
 ## 下一步（Next Actions）
 
-1. 发布候选版本：develop 最新 `4684cad355cb86dc049b6ded0221de68d7d92025`（PR #174 合入后）。已核对：`dist/SOURCE_SHA`=`a6028a02`，自该提交以来 `src/` 无差异；git 树与 R6 测过的 `acc61bb5` 完全一致，所以 R6 的结论直接适用，不需要再开一轮。
-2. 用户：发布决定——发布说明草稿 `docs/ai-reviewer-release-notes-draft.md` 已更新（包含 #325 的修复，提交改为上述 SHA）；发布前确认 dist 与发布提交一致（#319 / 上游 `ai-reviewer#168` 尚未落地）。
-3. 用户已决定**不补跑** R5 的批次 B（命令与对话）、C（配置变体）、D：按报告“验证范围说明”的口径发布——完整功能回归主要取自旧构建，发布候选版本上有 R2~R4 针对性回归与抽样回归、R5/R6 的 Phase 1~3 重放；B/C/D 对应的用例沿用 R1 结论。
-4. 不在范围（沿用 R1~R4 结论）：隔离环境用例（13 项）、账号 B 用例（6 项）、GitLab 28 项、FT-295、FT-224/225、FT-296/297。
-5. 测试仓库 main 当前固定的是 `acc61bb5`（与 develop 最新同树），无需再换 SHA；#319、#323 保持打开，等待上游。
+1. 发布候选版本：develop 最新（已含 `ai-reviewer#175` 的 dist 新鲜度检查，合并提交 `573c517`）；此前核对过的功能版本是 `4684cad355cb86dc049b6ded0221de68d7d92025`（树与 R6 测过的 `acc61bb5` 一致），之后 develop 只新增了 `scripts/check-dist-fresh.js`、单测和 `dist-fresh.yml`，`src/` 无变化，dist 仍新鲜（本地与 Actions 均通过）。
+2. **用户决定：暂时不合并到 main，等后期一起合并。** 因此 #168 的两个收尾步骤推迟到合并 main 之前：
+   - 把 `dist-fresh` 设为 main 的必需检查（main 当前没有任何保护规则；仓库公开，可用分支保护；已有一个未生效的 ruleset `ellis`）；
+   - 演练一遍“改 src → 检查变红 → 重新打包 → 变绿 → develop→main 的 PR 可合并”。
+     在这两步完成前，测试仓库 #319 保持打开；`ai-reviewer#168` 暂不关闭。
+3. 合并 main 前的清单（后期执行）：
+   1. develop 上 `node scripts/check-dist-fresh.js` 为 0（dist 新鲜）；若期间改过 `src/`，先重新打包并提交；
+   2. 如期间 develop 有新的功能变化，对照 `docs/ai-reviewer-functional-test-report.md` 的“验证范围说明”决定是否补测；
+   3. 补版本号并核对 `docs/ai-reviewer-release-notes-draft.md`（对照 `git log origin/main..origin/develop`）；
+   4. 完成 #168 的两个收尾步骤（必需检查 + 演练）；
+   5. 提 develop → main 的 PR，必需检查为绿后合并，创建 Release，确认 `latest` 标签更新；
+   6. 发布后在真实仓库按新标签跑一次 PR 审查。
+4. 不在范围（沿用 R1~R4 结论）：隔离环境用例（13 项）、账号 B 用例（6 项）、GitLab 28 项、FT-295、FT-224/225、FT-296/297；批次 B/C/D 经用户决定不补跑。
+5. 测试仓库 main 固定的是 `acc61bb5`（与 develop 功能版本同树）；#319、#323 保持打开，等待上游。
 
 ## R4 抽样回归计划（SHA 24c87694）
 
@@ -455,6 +464,7 @@
 
 ## 变更日志（倒序，只追加）
 
+- 2026-10-15T04:00:00Z：用户确认 `ai-reviewer#168` 的检查（PR #175，develop 573c517）已合入 develop。核对：脚本、单测、workflow 都在；本地运行三个 bundle 均新鲜、退出码 0；Actions 上 `dist-fresh` 在 develop 的运行为 success。查到 main 与 develop 都没有分支保护（仓库公开，ruleset `ellis` 为 disabled 且无分支条件）。用户决定暂不合并到 main、等后期一起合并，因此“设为 main 必需检查”与“演练”两步推迟到合并 main 前；#319 保持打开。
 - 2026-10-15T03:00:00Z：应用户要求给出上游 `ai-reviewer#168`（dist 落后源码的 CI 检查）的完整操作步骤：新增 `docs/upstream-168/`（检查脚本 check-dist-fresh.js、11 条单测、dist-fresh.yml、可选的 repack-dist.yml、README 步骤）。脚本已在 ai-reviewer 的真实历史上验证：0a63eb9（落后 45 个提交）与 9f20f5b（src/prompts.ts、src/review.ts 未打包）判失败，24c8769 与当前 develop 4684cad 判通过。由用户在上游仓库操作；落地并按步骤演练通过后，关闭测试仓库 #319。
 - 2026-10-15T02:00:00Z：用户决定不补跑 R5 的批次 B/C/D，按“验证范围说明”的口径发布；验收到此闭环。状态：GitHub 范围 198 项 PASS 193 / FAIL 0 / N/A 4 / SUBMITTED 1；发布候选 4684cad3；#319、#323 等待上游；批次 B/C/D 对应用例沿用 R1 结论。
 - 2026-10-15T01:00:00Z：用户确认 fix/similar-comments-r5 已合入 develop（PR #174，develop 最新 4684cad3）。核对：dist/SOURCE_SHA=a6028a02，自该提交以来 src 无差异；git 树与 R6 测过的 acc61bb5 完全一致，R6 结论直接适用。已关闭缺陷 #325（评论注明合并后只锚定第一个位置）；更新发布说明草稿与最终报告的发布建议。保持打开：#319、#323。
