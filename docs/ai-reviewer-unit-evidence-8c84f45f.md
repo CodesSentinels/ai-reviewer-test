@@ -124,9 +124,14 @@ npx jest __tests__/github-only.test.ts __tests__/characterization __tests__/comm
 - FT-182：web_search 失败但有正文 → 返回正文并记录失败步骤 — **passed**；开关关闭时不记录 web_search_call — **passed**；带 web_search 的请求被 400 拒绝 → 空文本不抛异常 — **passed**。
 - 失败的呈现：模型无响应时 `bot.chat` 返回空文本，`review.ts` 把空响应记入 `summariesFailed` / `reviewsFailed`，据此生成“审查不完整”提示（REVIEW-006），不会静默当成无问题。
 
+### FT-224 / FT-225 模型生成 JSON 的安全处理（ai-reviewer develop，工具调用参数）
+
+- 脚本：`functional-tests/ai-reviewer-fixtures/unit-evidence/review-tools-json-args.cjs`，8/8 通过。产品的审查输出不是 JSON，但模型发起只读代码探查工具调用时，`arguments` 是模型生成的 JSON 字符串（`src/review-tools.ts` 的 `executeReviewTool` 用 `JSON.parse` 解析）。
+- FT-224：截断 JSON、纯文本、空字符串、合法但非对象（数组 / null / 数字）、类型错误、路径穿越 — 全部以 error 文本返回，**passed**，不抛异常。
+- FT-225：被 Markdown 围栏包住的 JSON 不解包，按“arguments are not valid JSON”安全拒绝 — **passed**；未知工具名返回 unknown tool — **passed**。
+
 ## 不适用或无证据的用例（N/A）
 
-- **FT-224/225**：非法 JSON / Markdown 包裹 JSON：ai-reviewer 的审查输出不是 JSON 协议，而是“行号范围 + Markdown 评论”的文本格式（`src/review.ts` 里的 `JSON.parse` 只用来读取外部 lint 报告）→ 不适用，记 N/A。
 - **FT-296/297**：OpenAI / GitHub API 并发限制：用 `p-limit` 实现（`src/review.ts`），`p-limit` 在 jest 中同样被 mock，且没有对应用例 → 记 N/A。
 
 ## 仍未判定
