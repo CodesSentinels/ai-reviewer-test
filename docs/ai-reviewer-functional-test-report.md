@@ -52,13 +52,13 @@
 
 | 状态    | 数量 | 说明                                                                                                                                                   |
 | ------- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| PASS    | 195  | 均有真实 run / 评论 / 日志或单测证据，见进度文档总表                                                                                                   |
+| PASS    | 197  | 均有真实 run / 评论 / 日志或单测证据，见进度文档总表                                                                                                   |
 | FAIL    | 0    | R1 的 11 项 FAIL 经 R2/R3/R4 复测通过；R5 发现的 FT-093/094（缺陷 #325）经修复后在 R6 复测通过，修复在分支 `fix/similar-comments-r5`，尚未合入 develop |
 | BLOCKED | 0    | 无                                                                                                                                                     |
-| N/A     | 2    | FT-296/297（并发限制：用户称已自行验证正常但没有留存证据；真实 run 日志只显示并发请求数未超过上限，不足以证明限制生效）                                |
+| N/A     | 0    | 无（FT-296/297 经单测补证后判 PASS，见下）                                                                                                             |
 | 其余    | 1    | SUBMITTED 1（FT-295，API 调用统计不完整）。FT-213 经用户确认判 PASS，FT-300 即本报告判 PASS                                                            |
 
-统计口径：本报告只覆盖 GitHub。226 项中 GitLab 28 项不在本轮范围，本轮范围 198 项：PASS 195、FAIL 0、N/A 2、未完成 1（FT-295）。
+统计口径：本报告只覆盖 GitHub。226 项中 GitLab 28 项不在本轮范围，本轮范围 198 项：PASS 197、FAIL 0、N/A 0、未完成 1（FT-295）。
 
 ## R2 复测（修复后的 SHA）
 
@@ -93,7 +93,7 @@
 | 中                   | FT-055 | [#303](https://github.com/CodesSentinels/ai-reviewer-test/issues/303) | 去重只认完全相同的行范围，同一问题换范围后重复发布                                                                                                                      |
 | 中                   | FT-005 | [#311](https://github.com/CodesSentinels/ai-reviewer-test/issues/311) | OPENAI_API_KEY 为空时 run 仍 success，只有一条 warning，无明确失败                                                                                                      |
 | 中                   | FT-104 | [#309](https://github.com/CodesSentinels/ai-reviewer-test/issues/309) | HEAD 已审查过时 `review` 退回到从 base 全量重审                                                                                                                         |
-| 中                   | FT-036 | [#301](https://github.com/CodesSentinels/ai-reviewer-test/issues/301) | 仅格式化改动被判 NEEDS_REVIEW 并给出🔴严重评论（预期忽略轻微样式）                                                                                                      |
+| 中                   | FT-036 | [#301](https://github.com/CodesSentinels/ai-reviewer-test/issues/301) | 仅格式化改动被判 NEEDS_REVIEW 并给出 🔴 严重评论（预期忽略轻微样式）                                                                                                    |
 | 中                   | FT-147 | [#315](https://github.com/CodesSentinels/ai-reviewer-test/issues/315) | triage 角色被识别为 read（读取了 GitHub 旧字段 `permission`，triage 被折叠成 read），triage 用户无法执行 `configuration`；拒绝文案也固定写“需要 write”                  |
 | 中                   | FT-186 | [#316](https://github.com/CodesSentinels/ai-reviewer-test/issues/316) | shell 命令输出无任何脱敏，仅删除 4 个环境变量键；token 形态字符串原样回传模型                                                                                           |
 | 中                   | FT-197 | [#317](https://github.com/CodesSentinels/ai-reviewer-test/issues/317) | CI 下 Prettier 输出带 ANSI 颜色码，适配器正则不匹配，显式开启 Prettier 后永远 0 发现且无告警                                                                            |
@@ -119,7 +119,7 @@
 1. **shell 与 lint 已在隔离环境测过**（隔离仓库 ai-reviewer-test-iso，专用低额度 OpenAI key 与只读 token）：shell FT-184/185/187/188 PASS、FT-186 FAIL；lint FT-191~196/198~203 PASS、FT-197 FAIL。仅覆盖锁定 SHA 与上述配置，未覆盖更多项目类型（如 Vue、monorepo）。
 2. **权限矩阵已测，但 none 用户只有单测证据**：read（含 PR 作者豁免与 pause/resume/resolve 被拒）、write 已在真实 PR 验证；triage 正向用例失败（FT-147，缺陷 #315）；none 用户无法在 GitHub 上构造（私有仓库无权限者无法评论，公开仓库 API 对所有人返回 read），FT-149/151 以单测与 read 角色的真实拒绝回复判 PASS。另观察到 configuration 被拒时的文案写“需要 write”，与 help 表（triage）不一致。
 3. **fork PR 已测（FT-240~242 PASS），但仅限同一组织内的 fork**：fork 账号 B 为组织成员，且测试时临时开启“运行 fork PR workflow”（不发送 Secret）；外部陌生贡献者、需要审批的场景未单独验证。
-4. **容错路径已用单测补证**（FT-182、220~223，ai-reviewer develop 24c87694，真实 p-retry，15/15 通过）：429/5xx/超时重试后恢复，持续失败时返回空文本且不抛异常，空响应被记入“审查不完整”提示。并发限制（FT-296/297）没有留存证据（用户称已自行验证正常）。记录行为：401/400 等不可重试的客户端错误也被重试（默认约 31 秒），web_search 被拒时没有“去掉搜索再试”的回退。
+4. **容错路径已用单测补证**（FT-182、220~223，ai-reviewer develop 24c87694，真实 p-retry，15/15 通过）：429/5xx/超时重试后恢复，持续失败时返回空文本且不抛异常，空响应被记入“审查不完整”提示。并发限制（FT-296/297）用单测补证（驱动完整 codeReview，量模型调用与文件读取的最大同时在飞数，峰值恰等于上限，变异验证有效，6/6 通过）。记录行为：401/400 等不可重试的客户端错误也被重试（默认约 31 秒），web_search 被拒时没有“去掉搜索再试”的回退。
 5. **FT-213 已判 PASS（用户确认），但仅限基线**：基线下持密钥 job 在 pull_request 事件检出 PR 的 merge commit（`actions/checkout` 默认行为）；action 代码来自单独固定 SHA 的 checkout，shell/lint 关闭时 PR 代码不会被执行。若线上开启 shell/lint，该结论不成立。
 6. **FT-295** API 调用统计不完整。
 7. 其他注意：`debug_resolve_inject_failures` 在该 SHA 不生效，FT-061 以单测证据替代；限流缺陷 #308 为架构限制。
@@ -138,4 +138,4 @@
 3. **验证范围**：完整功能回归主要取自旧构建（见“验证范围说明”）；发布候选版本上做了针对性回归、抽样回归和 R5/R6 的 Phase 1~3 重放（46 项复核）。批次 B（命令与对话）、C（配置变体）、D 经发布负责人决定**不补跑**，这部分沿用 R1 的结论。
 4. **已知限制**：被 `max_review_comments` 截断的问题补发不保证完整（#323）；401/400 等不可重试错误也被重试；web search 被拒时没有回退。
 
-GitLab 另行验证，不在本报告范围内。核心路径（PR 触发审查、增量审查、去重幂等、暂停/恢复、对话追问、权限、限流、Secret 不泄露、shell 与 lint 工具链）在隔离环境与基线下通过，GitHub 范围 198 项中 195 项 PASS、0 项 FAIL。
+GitLab 另行验证，不在本报告范围内。核心路径（PR 触发审查、增量审查、去重幂等、暂停/恢复、对话追问、权限、限流、Secret 不泄露、shell 与 lint 工具链）在隔离环境与基线下通过，GitHub 范围 198 项中 197 项 PASS、0 项 FAIL。

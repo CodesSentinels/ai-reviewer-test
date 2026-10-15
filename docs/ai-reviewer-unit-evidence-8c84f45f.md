@@ -130,9 +130,14 @@ npx jest __tests__/github-only.test.ts __tests__/characterization __tests__/comm
 - FT-224：截断 JSON、纯文本、空字符串、合法但非对象（数组 / null / 数字）、类型错误、路径穿越 — 全部以 error 文本返回，**passed**，不抛异常。
 - FT-225：被 Markdown 围栏包住的 JSON 不解包，按“arguments are not valid JSON”安全拒绝 — **passed**；未知工具名返回 unknown tool — **passed**。
 
-## 不适用或无证据的用例（N/A）
+## 并发限制（FT-296/297，后补）
 
-- **FT-296/297**：OpenAI / GitHub API 并发限制：用 `p-limit` 实现（`src/review.ts`），`p-limit` 在 jest 中同样被 mock，且没有对应用例 → 记 N/A。
+- 脚本：`functional-tests/ai-reviewer-fixtures/unit-evidence/review-concurrency-limits.test.ts`（放入 ai-reviewer 的 `__tests__/` 运行，develop 4684cad3，6/6 通过）。
+- 做法：jest 把 `p-limit`（仅 ESM）映射成透传 shim，所以此前测不到。这里用一个真正排队的限流器替换它，驱动完整的 `codeReview`（8 个文件），量同时在飞数的峰值：模型调用（light + heavy 共用 `openaiConcurrencyLimit`）和 `getFileContent`（`githubConcurrencyLimit`）。
+- 结果：openai=1 → 峰值 1，openai=3 → 峰值 3（FT-296）；github=1 → 峰值 1，github=2 → 峰值 2（FT-297）；openai=2、github=3 两个上限互相独立；对照组上限放宽到 8，峰值升高（文件读取 8），证明量法有分辨力。
+- 变异验证：把 `pLimit(options.openaiConcurrencyLimit)` 临时改成 `pLimit(99)`，3 条 FT-296 相关用例失败；对 github 同样改动，3 条 FT-297 相关用例失败；已还原。
+- 另用 Node 24 直接加载真实 `p-limit` 4.0.0，8 个任务在 n=1/2/3 下峰值分别为 1/2/3，与测试里的限流器语义一致。
+- 边界：FT-297 覆盖的是审查流程里读取文件内容这一处 GitHub 调用（`review.ts` 中走 `githubConcurrencyLimit` 的位置）；依赖分析中另一处使用同一限制器的调用未单独量。
 
 ## 仍未判定
 
