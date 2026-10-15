@@ -1,0 +1,227 @@
+id	title	type	scenario	phase	generator	prerequisites	evidence	coverage	workflowVariant	faultInjection	requiredAccounts	destructive	estimatedModelCalls	relatedCases	baselineMeaningful	requiresIsolatedEnv
+FT-001	确认测试仓库正确	local-validation	env	preparation	validate_repository	none	command-output	e2e	baseline	none	none	no	0	-	yes	no
+FT-002	成功解析 develop 完整 SHA	local-validation	env	preparation	validate_develop_sha	network	full-sha	e2e	baseline	none	none	no	0	-	yes	no
+FT-003	Action 固定引用完整 SHA	local-validation	env	preparation	validate_sha_pin	FT-001	workflow-yaml,workflow-log	e2e	baseline	none	none	no	0	FT-002	yes	no
+FT-004	Node 24 下成功加载	external-observation	env	1	print_observation_steps	FT-010	workflow-log	unit-evidence	baseline	none	author	no	1	-	yes	no
+FT-005	缺少必要配置时明确失败	external-observation	env	variant	print_variant_steps	FT-010	workflow-log	e2e	missing-config	none	author	no	0	FT-006	yes	no
+FT-006	未知或无关事件安全跳过	external-observation	env	command	print_observation_steps	FT-010	workflow-run-list	e2e	baseline	none	read	no	0	-	yes	no
+FT-007	debug=false 不输出敏感内容	external-observation	env	variant	print_variant_steps	FT-010	workflow-log	e2e	debug-off	none	author	no	1	FT-008	yes	no
+FT-008	debug=true 仍不泄漏 Token	external-observation	env	1	print_observation_steps	FT-010	workflow-log	e2e	baseline	none	author	no	1	-	yes	no
+FT-009	workflow 使用最小权限	local-validation	env	preparation	validate_min_permissions	FT-001	workflow-yaml	e2e	baseline	none	none	no	0	-	yes	no
+FT-010	打开 PR 自动触发审查	external-observation	summary	1	generate_baseline	FT-001,FT-002	pr,workflow,summary	e2e	baseline	none	author	no	2	-	yes	no
+FT-011	synchronize/push 触发审查	external-observation	summary	2	generate_incremental	FT-010	phase2-run	e2e	baseline	none	author	no	2	-	yes	no
+FT-012	reopened 触发审查	external-observation	summary	command	print_observation_steps	FT-010	workflow-run-list	e2e	baseline	none	author	no	1	-	yes	no
+FT-013	生成唯一顶部摘要	external-observation	summary	1	print_observation_steps	FT-010	summary	e2e	baseline	none	author	no	1	-	yes	no
+FT-014	后续审查更新既有摘要	external-observation	summary	2	print_observation_steps	FT-010,FT-011	summary-edit-history	e2e	baseline	none	author	no	2	-	yes	no
+FT-015	摘要包含 Walkthrough	external-observation	summary	1	print_observation_steps	FT-010	summary	e2e	baseline	none	author	no	1	-	yes	no
+FT-016	摘要包含 Changes 表格	external-observation	summary	1	print_observation_steps	FT-010	summary	e2e	baseline	none	author	no	1	-	yes	no
+FT-017	相似文件合理合并	external-observation	summary	1	print_observation_steps	FT-010	summary	e2e	baseline	none	author	no	1	-	yes	no
+FT-018	正确生成发布说明	external-observation	summary	1	print_observation_steps	FT-010	pr-description,summary	e2e	baseline	none	author	no	1	-	yes	no
+FT-019	发布说明写入预期位置	external-observation	summary	1	print_observation_steps	FT-010	pr-description,summary	e2e	baseline	none	author	no	1	-	yes	no
+FT-020	disable_release_notes 生效	external-observation	summary	variant	print_variant_steps	FT-010	pr-description,workflow-log	e2e	no-release-notes	none	author	no	1	-	yes	no
+FT-021	disable_review 生效	external-observation	summary	variant	print_variant_steps	FT-010	workflow-log	e2e	no-review	none	author	no	0	-	yes	no
+FT-022	language=zh-CN 生效	external-observation	summary	variant	print_variant_steps	FT-010	summary	e2e	zh-cn	none	author	no	1	-	yes	no
+FT-023	bot_icon 生效	external-observation	summary	variant	print_variant_steps	FT-010	summary	e2e	bot-icon	none	author	no	1	-	yes	no
+FT-024	bot_name 生效	external-observation	summary	variant	print_variant_steps	FT-010	summary	e2e	bot-name	none	author	no	1	-	yes	no
+FT-030	识别明确逻辑错误	fixture	logic-bug	1	generate_logic_bug	FT-010	inline-comment	e2e	baseline	none	author	no	1	FT-033	yes	no
+FT-031	识别明确安全问题	fixture	security-bug	1	generate_security_bug	FT-010	inline-comment	e2e	baseline	none	author	no	1	-	yes	no
+FT-032	识别明显性能问题	fixture	performance-bug	1	generate_performance_bug	FT-010	inline-comment	e2e	baseline	none	author	no	1	-	yes	no
+FT-033	评论位于实际变更行	fixture	logic-bug	1	generate_logic_bug	FT-030	inline-comment,diff-hunk	e2e	baseline	none	author	no	1	-	yes	no
+FT-034	不评论不存在或未变更行	fixture	logic-bug	1	generate_logic_bug	FT-030	inline-comment,diff-hunk	e2e	baseline	none	author	no	1	-	yes	no
+FT-035	建议代码格式正确	fixture	logic-bug	1	generate_logic_bug	FT-030	inline-comment,diff-hunk	e2e	baseline	none	author	no	1	-	yes	no
+FT-036	默认忽略轻微样式问题	fixture	style-nit	1,2	generate_style_nit	FT-010	review-comments	e2e	baseline	none	author	no	1	-	yes	no
+FT-037	review_simple_changes=true 生效	fixture	style-nit	1,2	generate_style_nit	FT-036	review-comments	e2e	simple-changes	none	author	no	1	-	yes	no
+FT-038	review_comment_lgtm=false 生效	external-observation	inline-quality	variant	print_variant_steps	FT-010	review-comments	e2e	lgtm-off	none	author	no	1	-	yes	no
+FT-039	review_comment_lgtm=true 生效	external-observation	inline-quality	variant	print_variant_steps	FT-010	review-comments	e2e	lgtm-on	none	author	no	1	-	yes	no
+FT-040	非法模型输出安全处理	external-observation	inline-quality	1	print_observation_steps	none	unit-test-or-log	needs-injection	baseline	mock-invalid-model-output	none	no	0	-	yes	no
+FT-050	首次审查覆盖 base 到 HEAD	external-observation	incremental	1	print_observation_steps	FT-010	review-scope-log	e2e	baseline	none	author	no	1	-	yes	no
+FT-051	第二个 commit 仅审查新增变化	multi-phase	incremental	1,2	generate_incremental	FT-010	phase1-run,phase2-run	e2e	baseline	none	author	no	4	-	yes	no
+FT-052	已审查 commit 状态正确保存	multi-phase	incremental	1,2	generate_incremental	FT-010	phase1-run,phase2-run	e2e	baseline	none	author	no	4	-	yes	no
+FT-053	重跑相同 workflow 不重复发布	external-observation	incremental	2	print_observation_steps	FT-051	workflow-run-list,review-comments	e2e	baseline	none	author	no	2	-	yes	no
+FT-054	重复事件不重复执行完整审查	external-observation	incremental	2	print_observation_steps	FT-051	workflow-run-list,review-comments	e2e	baseline	none	author	no	2	-	yes	no
+FT-055	相同 finding 不重复发布	external-observation	incremental	2	print_observation_steps	FT-051	workflow-run-list,review-comments	e2e	baseline	none	author	no	2	-	yes	no
+FT-056	旧 HEAD 不覆盖新结果	multi-phase	stale-head	1,2	generate_incremental	FT-051	workflow-run-list,workflow-log	e2e	baseline	none	author	no	3	-	yes	no
+FT-057	陈旧事件安全跳过	multi-phase	stale-head	1,2	generate_incremental	FT-051	workflow-run-list,workflow-log	e2e	baseline	none	author	no	3	-	yes	no
+FT-058	修改回退后状态一致	multi-phase	revert	2,3	generate_revert	FT-051	phase2-run,phase3-run,summary	e2e	baseline	none	author	no	4	-	yes	no
+FT-059	full review 执行全量审查	manual-command	incremental	command	print_command_steps	FT-010	command-comment,workflow-log	e2e	baseline	none	author	no	1	-	yes	no
+FT-060	summary 只重建摘要	manual-command	incremental	command	print_command_steps	FT-010	command-comment,summary-edit-history	e2e	baseline	none	author	no	1	-	yes	no
+FT-061	部分评论失败时状态可解释	manual-command	incremental	command	print_command_steps	FT-010	command-comment,reply-text	needs-injection	baseline	resolve-partial-failure	write	no	1	FT-113	yes	no
+FT-062	异常以失败状态退出	external-observation	incremental	1	print_observation_steps	none	workflow-log,unit-test	unit-evidence	baseline	force-exception	none	no	1	-	yes	no
+FT-070	`@ai-reviewer: ignore` 跳过审查	external-observation	filter	command	print_observation_steps	FT-010	pr-description,workflow-log	e2e	baseline	none	author	no	0	-	yes	no
+FT-071	移除 ignore 后恢复审查	external-observation	filter	command	print_observation_steps	FT-010	pr-description,workflow-log	e2e	baseline	none	author	no	0	-	yes	no
+FT-072	path_filters 包含规则生效	fixture	path-filter	3	generate_path_filter	FT-051	summary,review-comments	e2e	baseline	none	author	no	1	-	yes	no
+FT-073	path_filters 排除规则生效	fixture	path-filter	3	generate_path_filter	FT-051	summary,review-comments	e2e	baseline	none	author	no	1	-	yes	no
+FT-074	dist 默认排除	fixture	path-filter	3	generate_path_filter	FT-051	summary,workflow-log	e2e	no-path-filters	none	author	no	1	-	yes	no
+FT-075	generated 默认排除	fixture	path-filter	3	generate_path_filter	FT-051	summary,workflow-log	e2e	no-path-filters	none	author	no	1	-	yes	no
+FT-076	二进制和图片默认排除	fixture	path-filter	3	generate_path_filter	FT-051	summary,workflow-log	e2e	no-path-filters	none	author	no	1	-	yes	no
+FT-077	max_files 生效	fixture	large-diff	3	generate_many_files	FT-051	workflow-log,summary	e2e	max-files	none	author	no	3	-	yes	no
+FT-078	超大 diff 安全处理	fixture	large-diff	3	generate_large_diff	FT-051	workflow-log,summary	e2e	baseline	none	author	no	3	-	yes	no
+FT-079	新增文件处理正确	multi-phase	file-ops	1,2	generate_file_ops	FT-010	summary,review-comments	e2e	baseline	none	author	no	3	-	yes	no
+FT-080	删除文件处理正确	multi-phase	file-ops	1,2	generate_file_ops	FT-010	summary,review-comments	e2e	baseline	none	author	no	3	-	yes	no
+FT-081	重命名文件处理正确	multi-phase	file-ops	1,2,3	generate_file_ops	FT-010	summary,review-comments	e2e	baseline	none	author	no	3	-	yes	no
+FT-082	空 diff 不产生垃圾评论	external-observation	filter	command	print_observation_steps	FT-010	workflow-log,review-comments	e2e	baseline	none	author	no	1	-	yes	no
+FT-090	max_review_comments 生效	fixture	noise-limit	3	generate_noise_limit	FT-051	review-comments	e2e	max-comments	none	author	no	3	-	yes	no
+FT-091	超限时优先保留高严重度问题	fixture	noise-limit	3	generate_noise_limit	FT-051	review-comments	e2e	max-comments	none	author	no	3	-	yes	no
+FT-092	截断后不重复评论	fixture	noise-limit	3	generate_noise_limit	FT-051	review-comments	e2e	max-comments	none	author	no	3	-	yes	no
+FT-093	相似 finding 正确去重	fixture	noise-limit	3	generate_noise_limit	FT-051	review-comments	e2e	baseline	none	author	no	3	-	yes	no
+FT-094	摘要与评论数量合理	fixture	noise-limit	3	generate_noise_limit	FT-051	review-comments	e2e	baseline	none	author	no	3	-	yes	no
+FT-095	简单改动不产生大量噪音	fixture	noise-limit	3	generate_simple_change	FT-051	review-comments	e2e	baseline	none	author	no	1	-	yes	no
+FT-100	`@ai-reviewer help`	manual-command	command	command	print_command_steps	FT-010	command-comment,reply-text	e2e	baseline	none	write	no	1	-	yes	no
+FT-101	`@codesentinel help`	manual-command	command	command	print_command_steps	FT-010	command-comment,reply-text	e2e	baseline	none	write	no	1	-	yes	no
+FT-102	真实 bot login 可触发命令	manual-command	command	command	print_command_steps	FT-010	command-comment,reply-text,workflow-log	e2e	baseline	none	author	no	1	-	yes	no
+FT-103	configuration	manual-command	command	command	print_command_steps	FT-010	command-comment,reply-text	e2e	baseline	none	write	no	1	-	yes	no
+FT-104	review	manual-command	command	command	print_command_steps	FT-010	command-comment,reply-text	e2e	baseline	none	author	no	1	-	yes	no
+FT-105	full review	manual-command	command	command	print_command_steps	FT-010	command-comment,reply-text	e2e	baseline	none	author	no	1	-	yes	no
+FT-106	summary	manual-command	command	command	print_command_steps	FT-010	command-comment,reply-text	e2e	baseline	none	author	no	1	-	yes	no
+FT-107	pause	manual-command	command	command	print_command_steps	FT-010	command-comment,reply-text	e2e	baseline	none	write	no	1	-	yes	no
+FT-108	pause 后不自动审查	external-observation	command	command	print_observation_steps	FT-010	workflow-run-list,summary	e2e	baseline	none	write	no	2	-	yes	no
+FT-109	resume	manual-command	command	command	print_command_steps	FT-010	command-comment,reply-text	e2e	baseline	none	write	no	1	-	yes	no
+FT-110	resume 后恢复审查	external-observation	command	command	print_observation_steps	FT-010	workflow-run-list,summary	e2e	baseline	none	write	no	2	-	yes	no
+FT-111	重复 pause 幂等	manual-command	command	command	print_command_steps	FT-010	command-comment,reply-text	e2e	baseline	none	write	no	1	-	yes	no
+FT-112	重复 resume 幂等	manual-command	command	command	print_command_steps	FT-010	command-comment,reply-text	e2e	baseline	none	write	no	1	-	yes	no
+FT-113	resolve	manual-command	command	command	print_command_steps	bot-thread	command-comment,thread-state	e2e	baseline	none	write	no	1	FT-114,FT-115	yes	no
+FT-114	resolve 只解决 bot thread	manual-command	command	command	print_command_steps	FT-113	command-comment,thread-state	e2e	baseline	none	write	no	1	-	yes	no
+FT-115	resolve 不解决真人 thread	manual-command	command	command	print_command_steps	FT-113	command-comment,thread-state	e2e	baseline	none	write	no	1	-	yes	no
+FT-116	命令 ack reaction 生效	external-observation	command	command	print_observation_steps	FT-010	reaction-screenshot,workflow-log	e2e	baseline	none	write	no	1	-	yes	no
+FT-117	reaction 关闭配置生效	external-observation	command	variant	print_variant_steps	FT-010	comment-reactions	e2e	no-ack-reaction	none	write	no	1	-	yes	no
+FT-118	相同评论只执行一次	manual-command	command	command	print_command_steps	FT-010	command-comment,reply-text	e2e	baseline	none	write	no	1	-	yes	no
+FT-119	未知英文命令返回帮助	manual-command	command	command	print_command_steps	FT-010	command-comment,reply-text	e2e	baseline	none	write	no	1	-	yes	no
+FT-120	自然语言进入对话	manual-command	command	command	print_command_steps	FT-010	command-comment,reply-text	e2e	baseline	none	write	no	1	-	yes	no
+FT-121	命令大小写不敏感	manual-command	command	command	print_command_steps	FT-010	command-comment,reply-text	e2e	baseline	none	write	no	1	-	yes	no
+FT-122	邮箱内 mention 不误触发	manual-command	command	command	print_command_steps	FT-010	command-comment,reply-text	e2e	baseline	none	write	no	1	-	yes	no
+FT-123	相似用户名不误触发	manual-command	command	command	print_command_steps	FT-010	command-comment,reply-text	e2e	baseline	none	write	no	1	-	yes	no
+FT-124	过长命令被拒绝	manual-command	command	command	print_command_steps	FT-010	command-comment,reply-text	e2e	baseline	none	write	no	1	-	yes	no
+FT-125	参数数量超限被拒绝	manual-command	command	command	print_command_steps	FT-010	command-comment,reply-text	e2e	baseline	none	write	no	1	-	yes	no
+FT-126	单参数过长被拒绝	manual-command	command	command	print_command_steps	FT-010	command-comment,reply-text	e2e	baseline	none	write	no	1	-	yes	no
+FT-127	Shell 元字符被拒绝	manual-command	command	command	print_command_steps	FT-010	command-comment,reply-text	e2e	baseline	none	write	no	1	-	yes	no
+FT-128	速率限制生效	manual-command	command	command	print_command_steps	FT-010	command-comment,reply-text	e2e	baseline	none	write	no	1	-	yes	no
+FT-129	顶层评论支持命令	manual-command	command	command	print_command_steps	FT-010	command-comment,reply-text	e2e	baseline	none	write	no	1	-	yes	no
+FT-130	行级 thread 支持命令	manual-command	command	command	print_command_steps	FT-010	command-comment,reply-text	e2e	baseline	none	write	no	1	-	yes	no
+FT-140	PR 作者可执行 review	manual-command	permission	command	print_command_steps	FT-010	command-comment,reply-text	e2e	baseline	none	author	no	1	-	yes	no
+FT-141	PR 作者可执行 full review	manual-command	permission	command	print_command_steps	FT-010	command-comment,reply-text	e2e	baseline	none	author	no	1	-	yes	no
+FT-142	PR 作者可执行 summary	manual-command	permission	command	print_command_steps	FT-010	command-comment,reply-text	e2e	baseline	none	author	no	1	-	yes	no
+FT-143	作者豁免不适用于 pause	manual-command	permission	command	print_command_steps	FT-010	command-comment,reply-text	e2e	baseline	none	author	no	1	-	yes	no
+FT-144	作者豁免不适用于 resume	manual-command	permission	command	print_command_steps	FT-010	command-comment,reply-text	e2e	baseline	none	author	no	1	-	yes	no
+FT-145	作者豁免不适用于 resolve	manual-command	permission	command	print_command_steps	FT-010	command-comment,reply-text	e2e	baseline	none	author	no	1	-	yes	no
+FT-146	write 用户可执行受限命令	manual-command	permission	command	print_command_steps	FT-010	command-comment,reply-text	e2e	baseline	none	write	no	1	-	yes	no
+FT-147	triage 用户可执行 configuration	manual-command	permission	command	print_command_steps	FT-010	command-comment,reply-text	e2e	baseline	none	triage	no	1	-	yes	no
+FT-148	read 用户可执行 help	manual-command	permission	command	print_command_steps	FT-010	command-comment,reply-text	e2e	baseline	none	read	no	1	-	yes	no
+FT-149	无权限用户被拒绝	manual-command	permission	command	print_command_steps	FT-010	command-comment,reply-text	e2e	baseline	none	no-permission	no	1	-	yes	no
+FT-150	权限查询失败时 fail closed	external-observation	permission	command	print_observation_steps	none	unit-test,log	unit-evidence	baseline	permission-api-failure	none	no	0	-	yes	no
+FT-151	GitHub 权限术语正确	external-observation	permission	command	print_observation_steps	FT-010	reply-text	e2e	baseline	none	no-permission	no	1	FT-149	yes	no
+FT-152	GitLab权限术语正确	external-gitlab	permission	gitlab	print_gitlab_steps	gitlab-runner	mr-note	e2e	baseline	none	gitlab-pat	no	1	-	yes	no
+FT-160	回复 bot 行级评论时结合 diff 回答	manual-command	conversation	command	print_command_steps	FT-030	reply-text,thread-state	e2e	baseline	none	author	no	1	-	yes	no
+FT-161	非 bot thread 显式 mention 可回答	manual-command	conversation	command	print_command_steps	FT-030	reply-text,thread-state	e2e	baseline	none	author	no	1	-	yes	no
+FT-162	无 mention 时不误回复	manual-command	conversation	command	print_command_steps	FT-030	reply-text,thread-state	e2e	baseline	none	author	no	1	-	yes	no
+FT-163	bot 自评论不触发回复	manual-command	conversation	command	print_command_steps	FT-030	reply-text,thread-state	e2e	baseline	none	author	no	1	-	yes	no
+FT-164	多轮对话保留上下文	manual-command	conversation	command	print_command_steps	FT-030	reply-text,thread-state	e2e	baseline	none	author	no	1	-	yes	no
+FT-165	长评论链安全截断	manual-command	conversation	command	print_command_steps	FT-030	reply-text,thread-state	e2e	baseline	none	author	no	1	-	yes	no
+FT-166	顶层自然语言提问行为正确	manual-command	conversation	command	print_command_steps	FT-030	reply-text,thread-state	e2e	baseline	none	author	no	1	-	yes	no
+FT-167	不声称读取不可用内容	manual-command	conversation	command	print_command_steps	FT-030	reply-text,thread-state	e2e	baseline	none	author	no	1	-	yes	no
+FT-168	重复 webhook 不重复回答	manual-command	conversation	command	print_command_steps	FT-160	webhook-redelivery,reply-text	e2e	baseline	none	author	no	1	-	yes	no
+FT-170	识别导出函数签名变化	multi-phase	cross-file	1,2	generate_cross_file	FT-010	inline-comment	e2e	baseline	none	author	no	3	-	yes	no
+FT-171	识别返回语义变化	multi-phase	cross-file	1,2	generate_cross_file	FT-010	inline-comment	e2e	baseline	none	author	no	3	-	yes	no
+FT-172	支持相对路径导入	fixture	cross-file	1	generate_cross_file	FT-010	inline-comment,workflow-log	e2e	baseline	none	author	no	1	-	yes	no
+FT-173	支持别名导入	fixture	cross-file	1	generate_cross_file	FT-010	inline-comment,workflow-log	e2e	baseline	none	author	no	1	-	yes	no
+FT-174	支持目录 index 导入	fixture	cross-file	1	generate_cross_file	FT-010	inline-comment,workflow-log	e2e	baseline	none	author	no	1	-	yes	no
+FT-175	关闭依赖分析后安全降级	external-observation	cross-file	variant	print_variant_steps	FT-170	workflow-log,review-comments	e2e	no-dependency-analysis	none	author	no	1	-	yes	no
+FT-176	max_dependency_files 生效	external-observation	cross-file	variant	print_variant_steps	FT-170	workflow-log	e2e	max-dependency-files	none	author	no	1	-	yes	no
+FT-177	无法解析依赖时安全降级	fixture	cross-file	3	generate_unresolved_import	FT-051	workflow-log,review-comments	e2e	baseline	none	author	no	1	-	yes	no
+FT-178	仓库树缓存不跨 PR 污染	external-observation	cross-file	command	print_observation_steps	FT-170	two-pr-comparison	e2e	baseline	none	author	no	4	-	yes	no
+FT-179	当前技术栈依赖分析正确	fixture	cross-file	1	generate_cross_file	FT-010	inline-comment,workflow-log	e2e	baseline	none	author	no	1	-	yes	no
+FT-180	enable_web_search=true 生效	external-observation	web-shell	1	print_observation_steps	FT-010	workflow-log	e2e	baseline	none	author	no	1	-	yes	no
+FT-181	enable_web_search=false 生效	external-observation	web-shell	variant	print_variant_steps	FT-010	workflow-log	e2e	web-search-off	none	author	no	1	-	yes	no
+FT-182	搜索失败后安全降级	external-observation	web-shell	1	print_observation_steps	none	workflow-log	needs-injection	baseline	block-search-egress	author	no	1	-	yes	no
+FT-183	enable_shell=false 时不执行 shell	external-observation	web-shell	1	print_observation_steps	FT-010	workflow-log	e2e	baseline	none	author	no	1	-	yes	no
+FT-184	shell=true 只在隔离无密钥环境测试	manual-security	web-shell	security	print_isolated_steps	FT-010	isolated-env-proof,workflow-log	e2e	shell-on-isolated	none	author	no	1	-	no	yes
+FT-185	shell 具有超时和输出限制	external-observation	web-shell	variant	print_variant_steps	FT-184	workflow-log	e2e	shell-on-isolated	none	author	no	1	-	no	yes
+FT-186	shell 输出脱敏	external-observation	web-shell	variant	print_variant_steps	FT-184	workflow-log	e2e	shell-on-isolated	none	author	no	1	-	no	yes
+FT-187	PR 内容不能诱导读取环境变量	fixture	shell-injection	3	generate_shell_injection	FT-184	workflow-log,review-output	e2e	shell-on-isolated	none	author	no	1	FT-245	no	yes
+FT-188	PR 内容不能诱导读取凭据目录	fixture	shell-injection	3	generate_shell_injection	FT-184	workflow-log,review-output	e2e	shell-on-isolated	none	author	no	1	FT-245	no	yes
+FT-190	enable_lint_tools=false 生效	external-observation	lint	1	print_observation_steps	FT-010	workflow-log	e2e	baseline	none	author	no	1	FT-191	yes	no
+FT-191	ESLint 有配置时发现问题	fixture	lint	1	generate_lint	FT-184	inline-comment,workflow-log	e2e	lint-on-isolated	none	author	no	1	-	no	yes
+FT-192	ESLint 无配置时安全降级	fixture	lint	1	generate_lint	FT-184	inline-comment,workflow-log	e2e	lint-on-isolated	none	author	no	1	-	no	yes
+FT-193	Biome 返回结构化结果	fixture	lint	1	generate_lint	FT-184	inline-comment,workflow-log	e2e	lint-on-isolated	none	author	no	1	-	no	yes
+FT-194	tsc 有 tsconfig 时运行	fixture	lint	1	generate_lint	FT-184	inline-comment,workflow-log	e2e	lint-on-isolated	none	author	no	1	-	no	yes
+FT-195	tsc 无配置时安全降级	fixture	lint	1	generate_lint	FT-184	inline-comment,workflow-log	e2e	lint-on-isolated	none	author	no	1	-	no	yes
+FT-196	Prettier 默认关闭	external-observation	lint	variant	print_variant_steps	FT-191	workflow-log,configuration-output	e2e	lint-on-isolated	none	author	no	1	-	no	yes
+FT-197	显式开启 Prettier 后生效	external-observation	lint	variant	print_variant_steps	FT-191	workflow-log,configuration-output	e2e	lint-on-isolated	none	author	no	1	-	no	yes
+FT-198	Semgrep 默认关闭	external-observation	lint	variant	print_variant_steps	FT-191	workflow-log,configuration-output	e2e	lint-on-isolated	none	author	no	1	-	no	yes
+FT-199	显式开启 Semgrep 后生效	external-observation	lint	variant	print_variant_steps	FT-191	workflow-log,configuration-output	e2e	lint-on-isolated	none	author	no	1	-	no	yes
+FT-200	semgrep_config 生效	external-observation	lint	variant	print_variant_steps	FT-191	workflow-log,configuration-output	e2e	lint-on-isolated	none	author	no	1	-	no	yes
+FT-201	工具版本覆盖生效	external-observation	lint	variant	print_variant_steps	FT-191	workflow-log,configuration-output	e2e	lint-on-isolated	none	author	no	1	-	no	yes
+FT-202	工具安装失败安全降级	external-observation	lint	variant	print_variant_steps	FT-191	workflow-log	e2e	lint-on-isolated	none	author	no	1	-	no	yes
+FT-203	工具超时安全处理	external-observation	lint	variant	print_variant_steps	FT-191	unit-test,workflow-log	unit-evidence	lint-on-isolated	none	author	no	1	-	no	yes
+FT-204	外部 lint_report_path 可读取	fixture	lint-report	1	generate_lint_report	FT-010	workflow-log,configuration-output	e2e	lint-report-path	none	author	no	1	-	yes	no
+FT-205	畸形报告顶层被拒绝	fixture	lint-report	1	generate_lint_report	FT-010	workflow-log,configuration-output	e2e	lint-report-path	none	author	no	1	-	yes	no
+FT-206	绝对路径 finding 被丢弃	fixture	lint-report	1	generate_lint_report	FT-010	workflow-log,configuration-output	e2e	lint-report-path	none	author	no	1	-	yes	no
+FT-207	`..` 路径被丢弃	fixture	lint-report	1	generate_lint_report	FT-010	workflow-log,configuration-output	e2e	lint-report-path	none	author	no	1	-	yes	no
+FT-208	非法 severity 被丢弃	fixture	lint-report	1	generate_lint_report	FT-010	workflow-log,configuration-output	e2e	lint-report-path	none	author	no	1	-	yes	no
+FT-209	非法行列号被丢弃	fixture	lint-report	1	generate_lint_report	FT-010	workflow-log,configuration-output	e2e	lint-report-path	none	author	no	1	-	yes	no
+FT-210	超量 finding 被截断	fixture	lint-report	1	generate_lint_report	FT-010	workflow-log,configuration-output	e2e	lint-report-path	none	author	no	1	-	yes	no
+FT-211	lint 提示词注入无效	fixture	lint-injection	1	generate_lint_report	FT-010	workflow-log,review-output	e2e	lint-report-path	none	author	no	1	FT-247	yes	no
+FT-212	lint 与 AI finding 去重	fixture	lint-dedupe	1	generate_lint_report	FT-030	review-comments	e2e	lint-report-path	none	author	no	1	-	yes	no
+FT-213	持密钥 job 不执行 PR 代码	manual-security	lint	security	print_security_steps	FT-001	workflow-yaml,workflow-log	e2e	baseline	none	author	no	0	-	yes	no
+FT-220	OpenAI 429 重试	external-observation	error	1	print_observation_steps	none	unit-test-or-log	needs-injection	baseline	mock-openai-429	none	no	0	FT-221	yes	no
+FT-221	OpenAI 5xx 重试	external-observation	error	1	print_observation_steps	none	unit-test-or-log	needs-injection	baseline	mock-openai-5xx	none	no	0	-	yes	no
+FT-222	OpenAI 超时正确处理	external-observation	error	1	print_observation_steps	none	unit-test-or-log	needs-injection	baseline	mock-openai-timeout	none	no	0	-	yes	no
+FT-223	空响应安全处理	external-observation	error	1	print_observation_steps	none	unit-test-or-log	needs-injection	baseline	mock-empty-response	none	no	0	-	yes	no
+FT-224	非法 JSON 安全处理	external-observation	error	1	print_observation_steps	none	unit-test-or-log	needs-injection	baseline	mock-invalid-json	none	no	0	-	yes	no
+FT-225	Markdown 包裹输出正确处理	external-observation	error	1	print_observation_steps	none	unit-test-or-log	needs-injection	baseline	mock-markdown-wrapped-json	none	no	0	-	yes	no
+FT-226	GitHub API 暂时失败时重试	external-observation	error	1	print_observation_steps	none	unit-test-or-log	needs-injection	baseline	mock-github-api-5xx	none	no	0	-	yes	no
+FT-227	GitLab API 暂时失败时重试	external-gitlab	error	gitlab	print_gitlab_steps	gitlab-runner	unit-test-or-log	needs-injection	baseline	mock-gitlab-api-5xx	gitlab-pat	no	0	-	yes	no
+FT-228	部分评论失败不破坏全部结果	external-observation	error	1	print_observation_steps	none	unit-test-or-log	needs-injection	baseline	mock-comment-post-failure	none	no	0	FT-061	yes	no
+FT-229	uncaughtException 导致任务失败	external-observation	error	1	print_observation_steps	none	unit-test,workflow-log	unit-evidence	baseline	force-process-error	none	no	0	-	yes	no
+FT-230	unhandledRejection 导致任务失败	external-observation	error	1	print_observation_steps	none	unit-test,workflow-log	unit-evidence	baseline	force-process-error	none	no	0	-	yes	no
+FT-231	日志不包含 Authorization header	external-observation	error	command	print_observation_steps	FT-010	workflow-log,log-grep-output	e2e	baseline	none	author	no	0	-	yes	no
+FT-232	日志不包含 Token 或 API Key	external-observation	error	command	print_observation_steps	FT-010	workflow-log,log-grep-output	e2e	baseline	none	author	no	0	-	yes	no
+FT-233	日志不包含敏感 URL 参数	external-observation	error	command	print_observation_steps	FT-010	workflow-log,log-grep-output	e2e	baseline	none	author	no	0	-	yes	no
+FT-240	fork PR 不在持密钥 job 执行代码	manual-security	security	security	print_fork_steps	test-fork	workflow-log,pr	e2e	baseline	none	fork-user	no	1	-	yes	no
+FT-241	fork 无法通过 workflow 修改获取 Secret	manual-security	security	security	print_fork_steps	test-fork	workflow-log,pr	e2e	baseline	none	fork-user	no	1	-	yes	no
+FT-242	fork artifact 被视为不可信数据	manual-security	security	security	print_fork_steps	test-fork	workflow-log,pr	e2e	baseline	none	fork-user	no	1	-	yes	no
+FT-243	恶意 PR 标题不能覆盖系统提示	manual-security	security	security	print_security_steps	FT-010	pr,review-output,workflow-log	e2e	baseline	none	author	no	1	FT-245	yes	no
+FT-244	恶意 PR 描述不能覆盖系统提示	manual-security	security	security	print_security_steps	FT-010	pr,review-output,workflow-log	e2e	baseline	none	author	no	1	FT-245	yes	no
+FT-245	恶意代码注释不能覆盖系统提示	fixture	prompt-injection	3	generate_prompt_injection	FT-051	review-output,workflow-log	e2e	baseline	none	author	no	1	-	yes	no
+FT-246	恶意文件名不能突破路径边界	fixture	prompt-injection	3	generate_prompt_injection	FT-051	review-output,workflow-log	e2e	baseline	none	author	no	1	-	yes	no
+FT-247	恶意 lint message 不能泄密	fixture	lint-injection	1	generate_lint_report	FT-010	workflow-log,review-output	e2e	lint-report-path	none	author	no	1	FT-211	yes	no
+FT-248	bot 自评论不形成循环	external-observation	security	command	print_observation_steps	FT-010	workflow-run-list	e2e	baseline	none	author	no	1	-	yes	no
+FT-249	重复 webhook 不形成循环	external-observation	security	command	print_observation_steps	FT-010	workflow-run-list	e2e	baseline	none	author	no	1	-	yes	no
+FT-250	日志无 OPENAI_API_KEY	external-observation	security	command	print_observation_steps	FT-010	workflow-log,log-grep-output	e2e	baseline	none	author	no	0	-	yes	no
+FT-251	日志无 GITHUB_TOKEN	external-observation	security	command	print_observation_steps	FT-010	workflow-log,log-grep-output	e2e	baseline	none	author	no	0	-	yes	no
+FT-252	日志无 GITLAB_PAT	external-gitlab	security	gitlab	print_gitlab_steps	gitlab-runner	pipeline,log-grep-output	e2e	baseline	none	gitlab-pat	no	0	-	yes	no
+FT-253	双平台状态 marker 独立	external-gitlab	security	gitlab	print_gitlab_steps	gitlab-runner	summary,mr-note	e2e	baseline	none	gitlab-pat	no	2	-	yes	no
+FT-260	MR open 触发审查	external-gitlab	gitlab	gitlab	print_gitlab_steps	gitlab-runner	pipeline,mr-note	e2e	baseline	none	gitlab-pat	no	2	-	yes	no
+FT-261	MR push 触发增量审查	external-gitlab	gitlab	gitlab	print_gitlab_steps	gitlab-runner	pipeline,mr-note	e2e	baseline	none	gitlab-pat	no	2	-	yes	no
+FT-262	MR reopen 触发审查	external-gitlab	gitlab	gitlab	print_gitlab_steps	gitlab-runner	pipeline,mr-note	e2e	baseline	none	gitlab-pat	no	2	-	yes	no
+FT-263	merge/close 不误触发	external-gitlab	gitlab	gitlab	print_gitlab_steps	gitlab-runner	pipeline,mr-note	e2e	baseline	none	gitlab-pat	no	2	-	yes	no
+FT-264	顶层 Note 进入命令路径	external-gitlab	gitlab	gitlab	print_gitlab_steps	gitlab-runner	pipeline,mr-note	e2e	baseline	none	gitlab-pat	no	2	-	yes	no
+FT-265	diff discussion 进入行级路径	external-gitlab	gitlab	gitlab	print_gitlab_steps	gitlab-runner	pipeline,mr-note	e2e	baseline	none	gitlab-pat	no	2	-	yes	no
+FT-266	非 MR note 被忽略	external-gitlab	gitlab	gitlab	print_gitlab_steps	gitlab-runner	pipeline,mr-note	e2e	baseline	none	gitlab-pat	no	0	-	yes	no
+FT-267	system note 被忽略	external-gitlab	gitlab	gitlab	print_gitlab_steps	gitlab-runner	pipeline,mr-note	e2e	baseline	none	gitlab-pat	no	0	-	yes	no
+FT-268	非 create note 被忽略	external-gitlab	gitlab	gitlab	print_gitlab_steps	gitlab-runner	pipeline,mr-note	e2e	baseline	none	gitlab-pat	no	0	-	yes	no
+FT-269	缺 project.id 时 fail closed	external-gitlab	gitlab	gitlab	print_gitlab_steps	gitlab-runner	pipeline,webhook-payload	e2e	baseline	none	gitlab-pat	no	0	-	yes	no
+FT-270	缺 MR iid 时 fail closed	external-gitlab	gitlab	gitlab	print_gitlab_steps	gitlab-runner	pipeline,webhook-payload	e2e	baseline	none	gitlab-pat	no	0	-	yes	no
+FT-271	缺 last_commit.id 时 fail closed	external-gitlab	gitlab	gitlab	print_gitlab_steps	gitlab-runner	pipeline,webhook-payload	e2e	baseline	none	gitlab-pat	no	0	-	yes	no
+FT-272	未知 object_kind 安全跳过	external-gitlab	gitlab	gitlab	print_gitlab_steps	gitlab-runner	pipeline,webhook-payload	e2e	baseline	none	gitlab-pat	no	0	-	yes	no
+FT-273	fork MR fail closed	external-gitlab	gitlab	gitlab	print_gitlab_steps	gitlab-runner	pipeline,mr-note	e2e	baseline	none	fork-user	no	0	-	yes	no
+FT-274	陈旧 MR HEAD 被跳过	external-gitlab	gitlab	gitlab	print_gitlab_steps	gitlab-runner	pipeline,mr-note	e2e	baseline	none	gitlab-pat	no	2	-	yes	no
+FT-275	相同 headSha 只审查一次	external-gitlab	gitlab	gitlab	print_gitlab_steps	gitlab-runner	pipeline,mr-note	e2e	baseline	none	gitlab-pat	no	2	-	yes	no
+FT-276	相同 note ID 只执行一次	external-gitlab	gitlab	gitlab	print_gitlab_steps	gitlab-runner	pipeline,mr-note	e2e	baseline	none	gitlab-pat	no	2	-	yes	no
+FT-277	bot 身份不一致时告警	external-gitlab	gitlab	gitlab	print_gitlab_steps	gitlab-runner	pipeline,mr-note	e2e	baseline	none	gitlab-pat	no	2	-	yes	no
+FT-278	subgroup 路径解析正确	external-gitlab	gitlab	gitlab	print_gitlab_steps	gitlab-runner	pipeline,mr-note	e2e	baseline	none	gitlab-pat	no	2	-	yes	no
+FT-279	PAT 身份与权限正确	external-gitlab	gitlab	gitlab	print_gitlab_steps	gitlab-runner	pipeline,mr-note	e2e	baseline	none	gitlab-pat	no	2	-	yes	no
+FT-280	CI_JOB_TOKEN 限制有明确诊断	external-gitlab	gitlab	gitlab	print_gitlab_steps	gitlab-runner	pipeline,mr-note	e2e	baseline	none	gitlab-pat	no	2	-	yes	no
+FT-281	GitLab API host 校验正确	external-gitlab	gitlab	gitlab	print_gitlab_steps	gitlab-runner	pipeline,mr-note	e2e	baseline	none	gitlab-pat	no	2	-	yes	no
+FT-282	GitLab diff 定位正确	external-gitlab	gitlab	gitlab	print_gitlab_steps	gitlab-runner	pipeline,mr-note	e2e	baseline	none	gitlab-pat	no	2	-	yes	no
+FT-283	GitLab 帮助术语正确	external-gitlab	gitlab	gitlab	print_gitlab_steps	gitlab-runner	pipeline,mr-note	e2e	baseline	none	gitlab-pat	no	2	-	yes	no
+FT-290	记录小 PR 执行时间	external-observation	perf	1	print_observation_steps	FT-010	workflow-duration	e2e	baseline	none	author	no	1	-	yes	no
+FT-291	记录中等 PR 执行时间	external-observation	perf	2	print_observation_steps	FT-051	workflow-duration	e2e	baseline	none	author	no	1	-	yes	no
+FT-292	记录大 PR 执行时间	fixture	large-diff	3	generate_large_diff	FT-078	workflow-duration	e2e	baseline	none	author	no	3	-	yes	no
+FT-293	记录 light model 调用数量	external-observation	perf	2	print_observation_steps	FT-051	workflow-log,api-usage-dashboard	e2e	baseline	none	author	no	1	-	yes	no
+FT-294	记录 heavy model 调用数量	external-observation	perf	2	print_observation_steps	FT-051	workflow-log,api-usage-dashboard	e2e	baseline	none	author	no	1	-	yes	no
+FT-295	记录平台 API 调用情况	external-observation	perf	2	print_observation_steps	FT-051	workflow-log,api-usage-dashboard	e2e	baseline	none	author	no	1	-	yes	no
+FT-296	OpenAI 并发限制生效	external-observation	perf	1	print_observation_steps	none	unit-test,workflow-log	unit-evidence	baseline	none	none	no	0	-	yes	no
+FT-297	GitHub API 并发限制生效	external-observation	perf	1	print_observation_steps	none	unit-test,workflow-log	unit-evidence	baseline	none	none	no	0	-	yes	no
+FT-298	重复事件不重复产生模型费用	external-observation	perf	2	print_observation_steps	FT-053	workflow-run-list,api-usage-dashboard	e2e	baseline	none	author	no	2	-	yes	no
+FT-299	日志可区分各执行阶段	external-observation	perf	1	print_observation_steps	FT-010	workflow-log	e2e	baseline	none	author	no	1	-	yes	no
+FT-300	最终报告包含发布建议	local-validation	perf	preparation	validate_report_recommendation	none	report-file	e2e	baseline	none	none	no	0	-	yes	no

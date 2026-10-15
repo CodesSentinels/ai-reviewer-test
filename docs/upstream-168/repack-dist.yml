@@ -1,0 +1,50 @@
+name: repack-dist
+
+# 可选（自动化方案）：develop 上的源码变化合入后，自动重新打包 dist 并提交。
+# 前提：develop 允许 github-actions[bot] 直接推送（没有“必须经 PR”的保护规则，或给 bot 开了绕过）。
+# 若做不到，就不要启用本文件，改为人工在合入后提交“重新打包 dist”。
+permissions:
+  contents: write
+
+on:
+  push:
+    branches: [develop]
+    paths:
+      - "src/**"
+      - "package-lock.json"
+      - "pnpm-lock.yaml"
+      - "tsconfig.json"
+      - "scripts/check-bundle-licenses.js"
+
+concurrency:
+  group: repack-dist
+  cancel-in-progress: false
+
+jobs:
+  repack:
+    runs-on: ubuntu-latest
+    # 机器人自己的提交（只改 dist/）不会再触发本 workflow：paths 过滤已经排除了 dist/，这里再加一道保险
+    if: github.actor != 'github-actions[bot]'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      # package 脚本会把 `git rev-parse HEAD` 写进各个 SOURCE_SHA——此时 HEAD 就是触发本次运行的合入提交
+      - run: npm run package
+      - name: 提交 dist（没有变化就不提交）
+        run: |
+          if git diff --quiet -- dist; then
+            echo "dist 没有变化"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dist
+          git commit -m "chore: 重新打包 dist（对应 $(git rev-parse HEAD)）"
+          git push origin HEAD:develop
