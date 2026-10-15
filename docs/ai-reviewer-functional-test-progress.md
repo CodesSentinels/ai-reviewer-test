@@ -29,12 +29,12 @@
 - r3_ai_reviewer_sha: b73adc3e2630bf70241298e515b59bfc5d727917
 - r3_sha_note: 修复分支 fix/regression-defects-r1 第二批修复的“重新打包 dist”提交；dist/SOURCE_SHA=66468ab2c85bd28d457b57c3d63b4cdd729b3dc9；获取时间 2026-10-14
 - r2_sha_note: ai-reviewer 修复分支 fix/regression-defects-r1 的“重新打包 dist”提交；dist/SOURCE_SHA=1ca3e94309ae54966a961052fa517848298a7cb5（源码修复提交）；获取时间 2026-10-13
-- last_updated: 2026-10-15T07:00:00Z
-- last_updated_by_step: FT-296/297 并发限制单测补证判 PASS，仅剩 FT-295
+- last_updated: 2026-10-15T08:00:00Z
+- last_updated_by_step: 已建上游 Issue ai-reviewer#177（API 调用统计），FT-295 等待上游
 
 ## 下一步（Next Actions）
 
-0. 本轮验收已闭环。Issue #299 仅剩 FT-295 未勾选（产品不输出按阶段的 API 调用统计，保持现状）；FT-296/297 已用单测补证判 PASS；后续只剩下面 1~5 的发布相关事项。
+0. 本轮验收已闭环。Issue #299 仅剩 FT-295 未勾选（产品不输出按阶段的 API 调用统计，已提上游 ai-reviewer#177，等待实现后重跑）；FT-296/297 已用单测补证判 PASS；后续只剩下面 1~5 的发布相关事项。
 1. 发布候选版本：develop 最新（已含 `ai-reviewer#175` 的 dist 新鲜度检查，合并提交 `573c517`）；此前核对过的功能版本是 `4684cad355cb86dc049b6ded0221de68d7d92025`（树与 R6 测过的 `acc61bb5` 一致），之后 develop 只新增了 `scripts/check-dist-fresh.js`、单测和 `dist-fresh.yml`，`src/` 无变化，dist 仍新鲜（本地与 Actions 均通过）。
 2. **用户决定：暂时不合并到 main，等后期一起合并。** 因此 #168 的两个收尾步骤推迟到合并 main 之前：
    - 把 `dist-fresh` 设为 main 的必需检查（main 当前没有任何保护规则；仓库公开，可用分支保护；已有一个未生效的 ruleset `ellis`）；
@@ -465,6 +465,7 @@
 
 ## 变更日志（倒序，只追加）
 
+- 2026-10-15T08:00:00Z：为 FT-295 建上游改进 Issue CodesSentinels/ai-reviewer#177（要求审查结束时输出按阶段的 GitHub API 调用统计）。FT-295 保持 SUBMITTED，上游实现后重跑一次审查即可判定；#319/#323 经用户决定先保留。
 - 2026-10-15T07:00:00Z：应用户要求补测并发限制。新增 ai-reviewer 单测 `review-concurrency-limits.test.ts`（副本在 functional-tests/ai-reviewer-fixtures/unit-evidence/）：用真正排队的限流器替换 jest 里透传的 p-limit shim，驱动完整 codeReview（8 个文件），量模型调用与 getFileContent 的最大同时在飞数，峰值恰等于上限（openai=1/3、github=1/2），上限放宽到 8 时升高；把 pLimit 参数改成 99 后对应用例失败（变异验证，已还原）；真实 p-limit 4.0.0 语义一致。FT-296/297 判 PASS，GitHub 范围 PASS 197 / N/A 0 / SUBMITTED 1（FT-295）。FT-295 仍不处理（产品无按阶段 API 统计）。
 - 2026-10-15T06:00:00Z：用户决定对 Issue #299 剩余 3 项未勾选（FT-295 API 调用统计、FT-296/297 并发限制）保持现状，已在最终报告“未覆盖风险”里写明原因（缺上游日志统计 / 无留存证据且日志观察不到上限生效）；不起草上游改进 Issue、不补测并发限制。本轮 GitHub 范围验收闭环：198 项 PASS 195 / FAIL 0 / N/A 2 / SUBMITTED 1。
 - 2026-10-15T05:00:00Z：应用户要求重新分析 Issue #299 未勾选项。FT-224/225 原判“设计上不适用”，重新评估后发现产品里确实有一处解析模型生成 JSON 的地方（只读代码探查工具调用的 arguments），补测 8 条场景（脚本 unit-evidence/review-tools-json-args.cjs，8/8 通过）：非法 JSON、纯文本、空串、非对象、类型错误、路径穿越、Markdown 围栏包住的 JSON、未知工具名，均安全返回错误、不抛异常，判 PASS（FT-225 注明产品不解包围栏，按非法 JSON 拒绝）。FT-296：真实 run 日志显示 OpenAI 并发请求最多 4~5（默认上限 6），与限制一致但没有触到上限，不足以证明限制生效，保持 N/A；FT-297 日志里没有逐次 GitHub API 调用，无法观察；FT-295 产品不输出各阶段 API 调用统计。汇总 PASS 195 / N/A 2 / SUBMITTED 1。

@@ -56,7 +56,7 @@
 | FAIL    | 0    | R1 的 11 项 FAIL 经 R2/R3/R4 复测通过；R5 发现的 FT-093/094（缺陷 #325）经修复后在 R6 复测通过，修复在分支 `fix/similar-comments-r5`，尚未合入 develop |
 | BLOCKED | 0    | 无                                                                                                                                                     |
 | N/A     | 0    | 无（FT-296/297 经单测补证后判 PASS，见下）                                                                                                             |
-| 其余    | 1    | SUBMITTED 1（FT-295，API 调用统计不完整）。FT-213 经用户确认判 PASS，FT-300 即本报告判 PASS                                                            |
+| 其余    | 1    | SUBMITTED 1（FT-295，API 调用统计不完整，已提上游 ai-reviewer#177）。FT-213 经用户确认判 PASS，FT-300 即本报告判 PASS                                  |
 
 统计口径：本报告只覆盖 GitHub。226 项中 GitLab 28 项不在本轮范围，本轮范围 198 项：PASS 197、FAIL 0、N/A 0、未完成 1（FT-295）。
 
