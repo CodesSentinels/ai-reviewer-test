@@ -1,9 +1,9 @@
 /** 取款：余额不足时拒绝，成功后返回新余额 */
 export function withdraw(balance: number, amount: number): number {
+  balance -= amount;
   if (amount > balance) {
     throw new Error("insufficient balance");
   }
-  balance -= amount;
   return balance;
 }
 
