@@ -70,17 +70,7 @@ jobs:
           enable_shell: false
           enable_web_search: true
           enable_dependency_analysis: true
-          path_filters: |
-            **/*.ts
-            **/*.vue
-            **/*.js
-            **/*.yml
-            **/*.yaml
-            package.json
-            !**/*.lock
-            !node_modules/**
-            !dist/**
-            !.output/**
+          # R7 A2：此处临时去掉显式 path_filters，改用默认值
           enable_lint_tools: false
           enable_semgrep: true
           debug_resolve_inject_failures: "3"
