@@ -43,10 +43,10 @@ export function splitByWeights(total: string, weights: number[], decimals: numbe
   if (weights.length === 0 || sum.isZero()) {
     throw new Error("splitByWeights: weights must be non-empty and sum to a non-zero value");
   }
-  const parts = weights.map((w) =>
-    new Decimal(total).mul(w).div(sum).toDecimalPlaces(decimals, Decimal.ROUND_DOWN)
-  );
-  const allocated = parts.slice(0, -1).reduce((acc, p) => acc.plus(p), new Decimal(0));
+  const parts = weights.map((w) => new Decimal(total).mul(w).div(sum).toDecimalPlaces(decimals, Decimal.ROUND_DOWN));
+  const allocated = parts
+    .slice(0, -1)
+    .reduce((acc, p) => acc.plus(p), new Decimal(0));
   parts[parts.length - 1] = new Decimal(total).minus(allocated);
   return parts.map((p) => p.toFixed(decimals));
 }
