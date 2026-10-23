@@ -67,7 +67,7 @@ jobs:
           review_simple_changes: false
           review_comment_lgtm: false
           openai_heavy_model: gpt-5.4-mini
-          enable_shell: false
+          enable_shell: true
           enable_web_search: true
           enable_dependency_analysis: true
           path_filters: |
