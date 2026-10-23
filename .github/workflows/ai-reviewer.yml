@@ -81,6 +81,6 @@ jobs:
             !node_modules/**
             !dist/**
             !.output/**
-          enable_lint_tools: false
+          enable_lint_tools: true
           enable_semgrep: true
           debug_resolve_inject_failures: "3"
