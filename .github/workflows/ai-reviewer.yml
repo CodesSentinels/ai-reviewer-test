@@ -70,17 +70,6 @@ jobs:
           enable_shell: false
           enable_web_search: true
           enable_dependency_analysis: true
-          path_filters: |
-            **/*.ts
-            **/*.vue
-            **/*.js
-            **/*.yml
-            **/*.yaml
-            package.json
-            !**/*.lock
-            !node_modules/**
-            !dist/**
-            !.output/**
           enable_lint_tools: true
           enable_semgrep: true
           debug_resolve_inject_failures: "3"
