@@ -1,0 +1,11 @@
+version: 1
+exclude:
+  - "**/legacy/**"
+rules:
+  - paths: ["src/web/**"]
+    instructions: 组件需要处理加载与错误状态
+profile:
+  languages: [swift]
+  domains: [frontend]
+project_context: |
+  这是一个面向终端用户的前端项目。

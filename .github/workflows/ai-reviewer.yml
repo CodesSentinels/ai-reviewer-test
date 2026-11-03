@@ -49,13 +49,13 @@ jobs:
         with:
           node-version: "20"
       - uses: actions/checkout@v4
-      # R7 锁定 SHA（develop 上的 v0.1.0-rc.12，dist 对应 738816d0768d508a6ccb1ba58a41230d2963b0b9），见总回归 Issue
-      - uses: actions/checkout@v4
-        with:
-          repository: CodesSentinels/ai-reviewer
-          ref: 24f4aafef64023a4918d705608ae1f8c6769b3de
-          path: .github/ai-reviewer-action
-          token: ${{ steps.bot-token.outputs.token }}
+      # #231 实测：匿名拉取公开仓库 probe/repo-config-dist 上的打包提交
+      - name: fetch action under test
+        run: |
+          git init -q .github/ai-reviewer-action
+          cd .github/ai-reviewer-action
+          git fetch -q --depth=1 https://github.com/CodesSentinels/ai-reviewer.git b452870de9bc5e8746cf93fbb5e33066d38bf46e
+          git checkout -q FETCH_HEAD
       - uses: ./.github/ai-reviewer-action
         env:
           GITHUB_TOKEN: ${{ steps.bot-token.outputs.token }}
@@ -68,19 +68,8 @@ jobs:
           review_comment_lgtm: false
           openai_heavy_model: gpt-5.4-mini
           enable_shell: false
-          enable_web_search: true
-          enable_dependency_analysis: true
-          path_filters: |
-            **/*.ts
-            **/*.vue
-            **/*.js
-            **/*.yml
-            **/*.yaml
-            package.json
-            !**/*.lock
-            !node_modules/**
-            !dist/**
-            !.output/**
-          enable_lint_tools: true
-          enable_semgrep: true
-          debug_resolve_inject_failures: "3"
+          enable_web_search: false
+          enable_dependency_analysis: false
+          enable_lint_tools: false
+          enable_semgrep: false
+          
