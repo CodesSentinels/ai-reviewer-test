@@ -1,0 +1,6 @@
+{
+  "results": [
+    {"tool": "eslint", "toolVersion": "9.0.0", "file": "functional-tests/ai-reviewer-fixtures/workspace/lint/lint-issues.ts", "line": 2, "column": 9, "severity": "fatal", "ruleId": "x/severity", "message": "invalid severity must be dropped"},
+    {"tool": "eslint", "toolVersion": "9.0.0", "file": "functional-tests/ai-reviewer-fixtures/workspace/lint/lint-issues.ts", "line": 3, "column": 3, "severity": "warning", "ruleId": "no-console", "message": "valid entry stays"}
+  ]
+}
