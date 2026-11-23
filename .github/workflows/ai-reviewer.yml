@@ -45,6 +45,9 @@ jobs:
         with:
           app-id: ${{ secrets.APP_ID }}
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          # ai-reviewer 已转为私有仓库：不指定时 token 只覆盖当前仓库，拉不到 action 代码
+          owner: ${{ github.repository_owner }}
+          repositories: ai-reviewer-test,ai-reviewer
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
