@@ -49,11 +49,11 @@ jobs:
         with:
           node-version: "20"
       - uses: actions/checkout@v4
-      # R7 锁定 SHA（develop 上的 v0.1.0-rc.12，dist 对应 738816d0768d508a6ccb1ba58a41230d2963b0b9），见总回归 Issue
+      # R8 锁定 SHA（develop 上的 v0.2.1-rc.1，#272 修复回测，dist SOURCE_SHA f1ceb47）
       - uses: actions/checkout@v4
         with:
           repository: CodesSentinels/ai-reviewer
-          ref: 24f4aafef64023a4918d705608ae1f8c6769b3de
+          ref: e408b3d5f3d09308f134ce936cceb35674932a30
           path: .github/ai-reviewer-action
           token: ${{ steps.bot-token.outputs.token }}
       - uses: ./.github/ai-reviewer-action
